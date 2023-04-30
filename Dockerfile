@@ -10,7 +10,6 @@ RUN mount=type=cache,target=/var/cache/apt \
         wget
 
 WORKDIR /app
-COPY antlr/grammar /app/grammar
 ADD https://github.com/antlr/antlr4/archive/refs/tags/4.12.0.tar.gz /app/
 RUN tar -xzf 4.12.0.tar.gz && \
     cd antlr4-4.12.0 && \

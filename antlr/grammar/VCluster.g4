@@ -19,21 +19,16 @@ serviceName: IDENTIFIER;
 configItem: 'dependency' '{' dependency+ '}'            # dependencyConfigItem
           | 'health_check' '{' healthCheck+ '}'         # healthCheckConfigItem
           | 'startup_sequence' '{' startupSequence+ '}' # startupSequenceConfigItem
-          | 'other' '{' otherConfig+ '}'                # otherConfigItem
           ;
 
-dependency: 'name' ':' IDENTIFIER ';'?;
+dependency: 'name' ':' IDENTIFIER ';'?                  # dependencyName
+          ;
 
 healthCheck: 'endpoint' ':' STRING_LITERAL ';'?         # endpointHealthCheck
-           | 'interval' ':' INTEGER_LITERAL ';'?        # intervalHealthCheck
-           | 'timeout' ':' INTEGER_LITERAL ';'?         # timeoutHealthCheck
            ;
 
-startupSequence: 'order' ':' INTEGER_LITERAL ';'?       # orderStartupSequence
-               | 'command' ':' STRING_LITERAL ';'?      # commandStartupSequence
+startupSequence: 'command' ':' STRING_LITERAL ';'?      # commandStartupSequence
                ;
-
-otherConfig: IDENTIFIER ':' (IDENTIFIER | STRING_LITERAL | INTEGER_LITERAL) ';';
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]*;
 
