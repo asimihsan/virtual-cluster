@@ -16,24 +16,31 @@ serviceConfig: 'service' serviceName '{' configItem+ '}';
 
 serviceName: IDENTIFIER;
 
-configItem: 'dependency' '{' dependency+ '}'
-          | 'health_check' '{' healthCheck+ '}'
-          | 'startup_sequence' '{' startupSequence+ '}'
-          | 'other' '{' otherConfig+ '}';
+configItem: 'dependency' '{' dependency+ '}'            # dependencyConfigItem
+          | 'health_check' '{' healthCheck+ '}'         # healthCheckConfigItem
+          | 'startup_sequence' '{' startupSequence+ '}' # startupSequenceConfigItem
+          | 'other' '{' otherConfig+ '}'                # otherConfigItem
+          ;
 
-dependency: 'name' ':' IDENTIFIER ';';
+dependency: 'name' ':' IDENTIFIER ';'?;
 
-healthCheck: 'endpoint' ':' STRING_LITERAL ';'
-           | 'interval' ':' INTEGER_LITERAL ';'
-           | 'timeout' ':' INTEGER_LITERAL ';';
+healthCheck: 'endpoint' ':' STRING_LITERAL ';'?         # endpointHealthCheck
+           | 'interval' ':' INTEGER_LITERAL ';'?        # intervalHealthCheck
+           | 'timeout' ':' INTEGER_LITERAL ';'?         # timeoutHealthCheck
+           ;
 
-startupSequence: 'order' ':' INTEGER_LITERAL ';'
-               | 'command' ':' STRING_LITERAL ';';
+startupSequence: 'order' ':' INTEGER_LITERAL ';'?       # orderStartupSequence
+               | 'command' ':' STRING_LITERAL ';'?      # commandStartupSequence
+               ;
 
 otherConfig: IDENTIFIER ':' (IDENTIFIER | STRING_LITERAL | INTEGER_LITERAL) ';';
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]*;
-STRING_LITERAL: '"' ~["]* '"';
+
+STRING_LITERAL: '"' (ESC|.)*? '"' | [a-zA-Z_][a-zA-Z_0-9.-]*;
+fragment
+ESC : '\\"' | '\\\\' ; // 2-char sequences \" and \\
+
 INTEGER_LITERAL: [0-9]+;
 WS: [ \t\r\n]+ -> skip;
 C_BLOCK_COMMENT: '/*' .*? '*/' -> skip;

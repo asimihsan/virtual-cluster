@@ -9,3 +9,37 @@
  */
 
 package utils
+
+// The value is either a quoted string with escaped characters, or an unescaped string without quotes.
+// We need to strip the quotes and unescape the string.
+func HandleStringLiteral(item string) string {
+	if len(item) == 0 {
+		return ""
+	}
+	if item[0] == '"' {
+		unquoted := item[1 : len(item)-1]
+		for i := 0; i < len(unquoted); i++ {
+			if unquoted[i] == '\\' {
+				if i == len(unquoted)-1 {
+					return unquoted
+				}
+				switch unquoted[i+1] {
+				case 'n':
+					unquoted = unquoted[:i] + "\n" + unquoted[i+2:]
+				case 'r':
+					unquoted = unquoted[:i] + "\r" + unquoted[i+2:]
+				case 't':
+					unquoted = unquoted[:i] + "\t" + unquoted[i+2:]
+				case '\\':
+					unquoted = unquoted[:i] + "\\" + unquoted[i+2:]
+				case '"':
+					unquoted = unquoted[:i] + "\"" + unquoted[i+2:]
+				default:
+					return unquoted
+				}
+			}
+		}
+		return unquoted
+	}
+	return item
+}

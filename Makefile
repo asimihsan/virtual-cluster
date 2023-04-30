@@ -1,4 +1,4 @@
 APP_NAME := $(shell basename $(PWD))
 
 build-docker:
-	docker build -t $(APP_NAME) .
+	docker buildx build -t $(APP_NAME) .

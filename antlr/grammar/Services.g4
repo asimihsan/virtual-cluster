@@ -16,14 +16,19 @@ serviceEntry: 'service' serviceName '{' serviceConfigItem+ '}';
 
 serviceName: IDENTIFIER;
 
-serviceConfigItem: 'repository' ':' STRING_LITERAL ';'
-                 | 'branch' ':' IDENTIFIER ';'
-                 | 'tag' ':' IDENTIFIER ';'
-                 | 'commit' ':' IDENTIFIER ';'
-                 | 'directory' ':' STRING_LITERAL ';';
+serviceConfigItem: 'repository' ':' STRING_LITERAL ';'?  # repository
+                 | 'branch' ':' STRING_LITERAL ';'?      # branch
+                 | 'tag' ':' STRING_LITERAL ';'?         # tag
+                 | 'commit' ':' STRING_LITERAL ';'?      # commit
+                 | 'directory' ':' STRING_LITERAL ';'?   # directory
+                 ;
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]*;
-STRING_LITERAL: '"' ~["]* '"';
+
+STRING_LITERAL: '"' (ESC|.)*? '"' | [a-zA-Z_][a-zA-Z_0-9.-]*;
+fragment
+ESC : '\\"' | '\\\\' ; // 2-char sequences \" and \\
+
 WS: [ \t\r\n]+ -> skip;
 C_BLOCK_COMMENT: '/*' .*? '*/' -> skip;
 CPP_LINE_COMMENT: '//' ~[\r\n]* -> skip;
