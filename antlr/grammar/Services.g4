@@ -25,7 +25,7 @@ serviceConfigItem: 'repository' ':' STRING_LITERAL ';'?  # repository
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]*;
 
-STRING_LITERAL: '"' (ESC|.)*? '"' | [a-zA-Z_][a-zA-Z_0-9.-]*;
+STRING_LITERAL: '"' (ESC|.)*? '"' | .*?;
 fragment
 ESC : '\\"' | '\\\\' ; // 2-char sequences \" and \\
 

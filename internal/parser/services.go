@@ -52,27 +52,47 @@ func (l *servicesListener) EnterServiceName(ctx *parser.ServiceNameContext) {
 }
 
 func (l *servicesListener) EnterRepository(ctx *parser.RepositoryContext) {
-	value := utils.HandleStringLiteral(ctx.STRING_LITERAL().GetText())
+	stringLiteral := ctx.STRING_LITERAL()
+	if stringLiteral == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(stringLiteral.GetText())
 	l.ast.Services[len(l.ast.Services)-1].Repository = &value
 }
 
 func (l *servicesListener) EnterBranch(ctx *parser.BranchContext) {
-	value := utils.HandleStringLiteral(ctx.STRING_LITERAL().GetText())
+	stringLiteral := ctx.STRING_LITERAL()
+	if stringLiteral == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(stringLiteral.GetText())
 	l.ast.Services[len(l.ast.Services)-1].Branch = &value
 }
 
 func (l *servicesListener) EnterTag(ctx *parser.TagContext) {
-	value := utils.HandleStringLiteral(ctx.STRING_LITERAL().GetText())
+	stringLiteral := ctx.STRING_LITERAL()
+	if stringLiteral == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(stringLiteral.GetText())
 	l.ast.Services[len(l.ast.Services)-1].Tag = &value
 }
 
 func (l *servicesListener) EnterCommit(ctx *parser.CommitContext) {
-	value := utils.HandleStringLiteral(ctx.STRING_LITERAL().GetText())
+	stringLiteral := ctx.STRING_LITERAL()
+	if stringLiteral == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(stringLiteral.GetText())
 	l.ast.Services[len(l.ast.Services)-1].Commit = &value
 }
 
 func (l *servicesListener) EnterDirectory(ctx *parser.DirectoryContext) {
-	value := utils.HandleStringLiteral(ctx.STRING_LITERAL().GetText())
+	stringLiteral := ctx.STRING_LITERAL()
+	if stringLiteral == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(stringLiteral.GetText())
 	l.ast.Services[len(l.ast.Services)-1].Directory = &value
 }
 

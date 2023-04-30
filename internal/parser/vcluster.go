@@ -82,13 +82,21 @@ func (l *vclusterListener) EnterDependencyName(ctx *parser.DependencyNameContext
 }
 
 func (l *vclusterListener) EnterEndpointHealthCheck(ctx *parser.EndpointHealthCheckContext) {
-	endpoint := utils.HandleStringLiteral(ctx.STRING_LITERAL().GetText())
-	l.ast.Services[len(l.ast.Services)-1].HealthChecks.Endpoint = endpoint
+	stringLiteral := ctx.STRING_LITERAL()
+	if stringLiteral == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(stringLiteral.GetText())
+	l.ast.Services[len(l.ast.Services)-1].HealthChecks.Endpoint = value
 }
 
 func (l *vclusterListener) EnterCommandStartupSequence(ctx *parser.CommandStartupSequenceContext) {
-	command := utils.HandleStringLiteral(ctx.STRING_LITERAL().GetText())
-	l.ast.Services[len(l.ast.Services)-1].StartupSeq[len(l.ast.Services[len(l.ast.Services)-1].StartupSeq)-1].Command = command
+	stringLiteral := ctx.STRING_LITERAL()
+	if stringLiteral == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(stringLiteral.GetText())
+	l.ast.Services[len(l.ast.Services)-1].StartupSeq[len(l.ast.Services[len(l.ast.Services)-1].StartupSeq)-1].Command = value
 }
 
 type vclusterErrorListenerType struct {
