@@ -19,7 +19,7 @@ pushd $ROOT_DIR || exit > /dev/null
 trap "popd > /dev/null" EXIT
 
 # Build the Docker image
-docker build -t my-antlr-build .
+docker buildx build -t my-antlr-build --load .
 
 # Generate a unique container name with a timestamp
 container_name="temp-container-$(date +%s)"
