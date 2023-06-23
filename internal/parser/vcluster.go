@@ -203,7 +203,7 @@ func ParseVCluster(input string) (*VClusterAST, error) {
 	vClusterParser.RemoveErrorListeners()
 	vClusterParser.AddErrorListener(errorListener)
 
-	// Create the listener and walk the tree starting at ServicesConfig
+	// Create the listener and walk the tree starting at vclusterConfig
 	listener := &vclusterListener{}
 
 	antlr.NewParseTreeWalker().Walk(listener, vClusterParser.VclusterConfig())

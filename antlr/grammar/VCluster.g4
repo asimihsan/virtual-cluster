@@ -31,7 +31,7 @@ serviceConfigItem: 'repository' ':' STRING_LITERAL ';'?  # serviceConfigReposito
                  | 'directory' ':' STRING_LITERAL ';'?   # serviceConfigDirectory
                  | 'health_check' '{' healthCheck+ '}'   # serviceConfigHealthCheck
                  | 'dependency' ':' IDENTIFIER ';'?      # serviceConfigDependency
-                 | 'run_commands' ':' '[' STRING_LITERAL (',' STRING_LITERAL)* ']' ';'?  # serviceConfigRunCommands
+                 | 'run_commands' ':' '[' STRING_LITERAL (',' STRING_LITERAL)* ','? ']' ';'?  # serviceConfigRunCommands
                  ;
 
 dependencyConfigItem: 'health_check' '{' healthCheck+ '}'   # dependencyConfigHealthCheck

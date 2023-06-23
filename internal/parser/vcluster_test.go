@@ -81,6 +81,34 @@ func TestParseVCluster_ServiceWithTwoRunCommands(t *testing.T) {
 	assert.Equal(t, expected, ast)
 }
 
+func TestParseVCluster_ServiceWithTwoRunCommandsAnotherFormat(t *testing.T) {
+	input := `
+    service my_service {
+        run_commands: [
+			"make build",
+			"make run",
+		];
+    }
+    `
+
+	ast, err := ParseVCluster(input)
+	assert.NoError(t, err)
+
+	expected := &VClusterAST{
+		Services: []VClusterServiceDefinitionAST{
+			{
+				Name: "my_service",
+				RunCommands: []string{
+					"make build",
+					"make run",
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, expected, ast)
+}
+
 func TestParseVCluster_ServiceWithNoRunCommands(t *testing.T) {
 	input := `
     service my_service {
