@@ -12,33 +12,42 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/antlr4-go/antlr/v4"
 	parser "github.com/asimihsan/virtual-cluster/generated/vcluster"
 	"github.com/asimihsan/virtual-cluster/internal/utils"
-	"strconv"
 )
 
 type VClusterAST struct {
-	Services []VClusterDefinitionAST
+	Services     []VClusterServiceDefinitionAST
+	Dependencies []VClusterDependencyDefinitionAST
 }
 
-type VClusterDefinitionAST struct {
+type VClusterServiceDefinitionAST struct {
 	Name         string
+	Repository   *string
+	Branch       *string
+	Tag          *string
+	Commit       *string
+	Directory    *string
+	HealthChecks HealthCheck
 	Dependencies []VClusterDependency
-	HealthChecks VClusterHealthCheck
-	StartupSeq   []VClusterStartupSequence
+	RunCommands  []string
 }
 
 type VClusterDependency struct {
 	Name string
 }
 
-type VClusterHealthCheck struct {
+type HealthCheck struct {
 	Endpoint string
 }
 
-type VClusterStartupSequence struct {
-	Command string
+type VClusterDependencyDefinitionAST struct {
+	Name         string
+	HealthChecks HealthCheck
+	Dependencies []VClusterDependency
 }
 
 type vclusterListener struct {
@@ -51,9 +60,16 @@ func (l *vclusterListener) EnterVclusterConfig(ctx *parser.VclusterConfigContext
 	l.ast = &VClusterAST{}
 }
 
-func (l *vclusterListener) EnterServiceConfig(ctx *parser.ServiceConfigContext) {
-	serviceConfig := VClusterDefinitionAST{}
+func (l *vclusterListener) EnterConfigEntry(ctx *parser.ConfigEntryContext) {}
+
+func (l *vclusterListener) EnterServiceEntry(ctx *parser.ServiceEntryContext) {
+	serviceConfig := VClusterServiceDefinitionAST{}
 	l.ast.Services = append(l.ast.Services, serviceConfig)
+}
+
+func (l *vclusterListener) EnterDependencyEntry(ctx *parser.DependencyEntryContext) {
+	dependencyConfig := VClusterDependencyDefinitionAST{}
+	l.ast.Dependencies = append(l.ast.Dependencies, dependencyConfig)
 }
 
 func (l *vclusterListener) EnterServiceName(ctx *parser.ServiceNameContext) {
@@ -61,42 +77,93 @@ func (l *vclusterListener) EnterServiceName(ctx *parser.ServiceNameContext) {
 	l.ast.Services[len(l.ast.Services)-1].Name = serviceName
 }
 
-func (l *vclusterListener) EnterDependencyConfigItem(ctx *parser.DependencyConfigItemContext) {
-	dependency := VClusterDependency{}
-	l.ast.Services[len(l.ast.Services)-1].Dependencies = append(l.ast.Services[len(l.ast.Services)-1].Dependencies, dependency)
+func (l *vclusterListener) EnterDependencyName(ctx *parser.DependencyNameContext) {
+	dependencyName := ctx.IDENTIFIER().GetText()
+	l.ast.Dependencies[len(l.ast.Dependencies)-1].Name = dependencyName
 }
 
-func (l *vclusterListener) EnterHealthCheckConfigItem(ctx *parser.HealthCheckConfigItemContext) {
-	healthCheck := VClusterHealthCheck{}
+func (l *vclusterListener) EnterServiceConfigRepository(ctx *parser.ServiceConfigRepositoryContext) {
+	repository := ctx.STRING_LITERAL()
+	if repository == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(repository.GetText())
+	l.ast.Services[len(l.ast.Services)-1].Repository = &value
+}
+
+func (l *vclusterListener) EnterServiceConfigBranch(ctx *parser.ServiceConfigBranchContext) {
+	branch := ctx.STRING_LITERAL()
+	if branch == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(branch.GetText())
+	l.ast.Services[len(l.ast.Services)-1].Branch = &value
+}
+
+func (l *vclusterListener) EnterServiceConfigTag(ctx *parser.ServiceConfigTagContext) {
+	tag := ctx.STRING_LITERAL()
+	if tag == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(tag.GetText())
+	l.ast.Services[len(l.ast.Services)-1].Tag = &value
+}
+
+func (l *vclusterListener) EnterServiceConfigCommit(ctx *parser.ServiceConfigCommitContext) {
+	commit := ctx.STRING_LITERAL()
+	if commit == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(commit.GetText())
+	l.ast.Services[len(l.ast.Services)-1].Commit = &value
+}
+
+func (l *vclusterListener) EnterServiceConfigDirectory(ctx *parser.ServiceConfigDirectoryContext) {
+	directory := ctx.STRING_LITERAL()
+	if directory == nil {
+		return
+	}
+	value := utils.HandleStringLiteral(directory.GetText())
+	l.ast.Services[len(l.ast.Services)-1].Directory = &value
+}
+
+func (l *vclusterListener) EnterServiceConfigHealthCheck(ctx *parser.ServiceConfigHealthCheckContext) {
+	healthCheck := HealthCheck{}
 	l.ast.Services[len(l.ast.Services)-1].HealthChecks = healthCheck
 }
 
-func (l *vclusterListener) EnterStartupSequenceConfigItem(ctx *parser.StartupSequenceConfigItemContext) {
-	startupSequence := VClusterStartupSequence{}
-	l.ast.Services[len(l.ast.Services)-1].StartupSeq = append(l.ast.Services[len(l.ast.Services)-1].StartupSeq, startupSequence)
+func (l *vclusterListener) EnterServiceConfigDependency(ctx *parser.ServiceConfigDependencyContext) {}
+
+func (l *vclusterListener) EnterDependencyConfigHealthCheck(ctx *parser.DependencyConfigHealthCheckContext) {
+	healthCheck := HealthCheck{}
+	l.ast.Dependencies[len(l.ast.Dependencies)-1].HealthChecks = healthCheck
 }
 
-func (l *vclusterListener) EnterDependencyName(ctx *parser.DependencyNameContext) {
-	dependencyName := ctx.IDENTIFIER().GetText()
-	l.ast.Services[len(l.ast.Services)-1].Dependencies[len(l.ast.Services[len(l.ast.Services)-1].Dependencies)-1].Name = dependencyName
+func (l *vclusterListener) EnterDependencyConfigDependency(ctx *parser.DependencyConfigDependencyContext) {
+	dependency := VClusterDependency{}
+	l.ast.Dependencies[len(l.ast.Dependencies)-1].Dependencies = append(l.ast.Dependencies[len(l.ast.Dependencies)-1].Dependencies, dependency)
 }
 
-func (l *vclusterListener) EnterEndpointHealthCheck(ctx *parser.EndpointHealthCheckContext) {
-	stringLiteral := ctx.STRING_LITERAL()
-	if stringLiteral == nil {
+func (l *vclusterListener) EnterHealthCheckEndpoint(ctx *parser.HealthCheckEndpointContext) {
+	endpoint := ctx.STRING_LITERAL()
+	if endpoint == nil {
 		return
 	}
-	value := utils.HandleStringLiteral(stringLiteral.GetText())
+	value := utils.HandleStringLiteral(endpoint.GetText())
+
+	// TODO this is incorrect because this could also be a dependency healthcheck, how to handle?
 	l.ast.Services[len(l.ast.Services)-1].HealthChecks.Endpoint = value
 }
 
-func (l *vclusterListener) EnterCommandStartupSequence(ctx *parser.CommandStartupSequenceContext) {
-	stringLiteral := ctx.STRING_LITERAL()
-	if stringLiteral == nil {
+func (l *vclusterListener) EnterServiceConfigRunCommands(ctx *parser.ServiceConfigRunCommandsContext) {
+	runCommands := ctx.AllSTRING_LITERAL()
+	if runCommands == nil {
 		return
 	}
-	value := utils.HandleStringLiteral(stringLiteral.GetText())
-	l.ast.Services[len(l.ast.Services)-1].StartupSeq[len(l.ast.Services[len(l.ast.Services)-1].StartupSeq)-1].Command = value
+	for _, runCommand := range runCommands {
+		value := utils.HandleStringLiteral(runCommand.GetText())
+		l.ast.Services[len(l.ast.Services)-1].RunCommands = append(l.ast.Services[len(l.ast.Services)-1].RunCommands, value)
+	}
 }
 
 type vclusterErrorListenerType struct {

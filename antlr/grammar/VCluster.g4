@@ -10,25 +10,36 @@
 
 grammar VCluster;
 
-vclusterConfig: serviceConfig+ EOF;
+vclusterConfig: configEntry+ EOF;
 
-serviceConfig: 'service' serviceName '{' configItem+ '}';
+configEntry: serviceEntry
+           | dependencyEntry
+           ;
+
+serviceEntry: 'service' serviceName '{' serviceConfigItem+ '}';
+
+dependencyEntry: 'dependency' dependencyName '{' dependencyConfigItem+ '}';
 
 serviceName: IDENTIFIER;
 
-configItem: 'dependency' '{' dependency+ '}'            # dependencyConfigItem
-          | 'health_check' '{' healthCheck+ '}'         # healthCheckConfigItem
-          | 'startup_sequence' '{' startupSequence+ '}' # startupSequenceConfigItem
-          ;
+dependencyName: IDENTIFIER;
 
-dependency: 'name' ':' IDENTIFIER ';'?                  # dependencyName
-          ;
+serviceConfigItem: 'repository' ':' STRING_LITERAL ';'?  # serviceConfigRepository
+                 | 'branch' ':' STRING_LITERAL ';'?      # serviceConfigBranch
+                 | 'tag' ':' STRING_LITERAL ';'?         # serviceConfigTag
+                 | 'commit' ':' STRING_LITERAL ';'?      # serviceConfigCommit
+                 | 'directory' ':' STRING_LITERAL ';'?   # serviceConfigDirectory
+                 | 'health_check' '{' healthCheck+ '}'   # serviceConfigHealthCheck
+                 | 'dependency' ':' IDENTIFIER ';'?      # serviceConfigDependency
+                 | 'run_commands' ':' '[' STRING_LITERAL (',' STRING_LITERAL)* ']' ';'?  # serviceConfigRunCommands
+                 ;
 
-healthCheck: 'endpoint' ':' STRING_LITERAL ';'?         # endpointHealthCheck
+dependencyConfigItem: 'health_check' '{' healthCheck+ '}'   # dependencyConfigHealthCheck
+                     | 'dependency' ':' IDENTIFIER ';'?     # dependencyConfigDependency
+                     ;
+
+healthCheck: 'endpoint' ':' STRING_LITERAL ';'?         # healthCheckEndpoint
            ;
-
-startupSequence: 'command' ':' STRING_LITERAL ';'?      # commandStartupSequence
-               ;
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]*;
 
@@ -36,7 +47,6 @@ STRING_LITERAL: '"' (ESC|.)*? '"' | [a-zA-Z_][a-zA-Z_0-9.-]*;
 fragment
 ESC : '\\"' | '\\\\' ; // 2-char sequences \" and \\
 
-INTEGER_LITERAL: [0-9]+;
 WS: [ \t\r\n]+ -> skip;
 C_BLOCK_COMMENT: '/*' .*? '*/' -> skip;
 CPP_LINE_COMMENT: '//' ~[\r\n]* -> skip;
