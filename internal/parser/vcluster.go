@@ -13,7 +13,7 @@ package parser
 import (
 	"fmt"
 	"github.com/antlr4-go/antlr/v4"
-	parser "github.com/asimihsan/virtual-cluster/generated/vcluster/grammar"
+	parser "github.com/asimihsan/virtual-cluster/generated/vcluster"
 	"github.com/asimihsan/virtual-cluster/internal/utils"
 	"strconv"
 )

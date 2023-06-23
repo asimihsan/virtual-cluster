@@ -29,8 +29,11 @@ COPY --from=antlr-jar \
     /app/antlr4-$ANTLR_VERSION/tool/target/antlr4-$ANTLR_VERSION-complete.jar \
     /app/antlr4-$ANTLR_VERSION-complete.jar
 COPY --link antlr/grammar /app/grammar
-RUN java -jar /app/antlr4-$ANTLR_VERSION-complete.jar -Dlanguage=Go -listener -no-visitor -o /app/generated/vcluster grammar/VCluster.g4 && \
-    java -jar /app/antlr4-$ANTLR_VERSION-complete.jar -Dlanguage=Go -listener -no-visitor -o /app/generated/services grammar/Services.g4
+
+RUN for file in /app/grammar/*.g4; do \
+        basename=$(basename $file .g4 | tr '[:upper:]' '[:lower:]'); \
+        java -jar /app/antlr4-$ANTLR_VERSION-complete.jar -Dlanguage=Go -listener -no-visitor -o /app/generated/$basename $file; \
+    done
 
 # Build stage for Go
 FROM golang:1.20.5-bullseye as go-build
