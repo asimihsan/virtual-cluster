@@ -12,11 +12,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/asimihsan/virtual-cluster/internal/parser"
+	"github.com/asimihsan/virtual-cluster/internal/substrate"
+	"github.com/urfave/cli/v2"
 	"os"
 	"path/filepath"
-
-	"github.com/asimihsan/virtual-cluster/internal/parser"
-	"github.com/urfave/cli/v2"
 )
 
 func main() {
@@ -42,9 +42,24 @@ func main() {
 								Aliases: []string{"f"},
 								Usage:   "config file",
 							},
+							&cli.StringFlag{
+								Name:  "db-path",
+								Usage: "filepath to database",
+							},
 						},
 						Action: func(c *cli.Context) error {
+							dbPath := c.String("db-path")
+							if dbPath == "" {
+								fmt.Fprintf(os.Stderr, "db-path is required\n")
+								return nil
+							}
+							if fi, err := os.Stat(dbPath); err == nil && fi.IsDir() {
+								fmt.Fprintf(os.Stderr, "db-path '%s' is a directory\n", dbPath)
+								return nil
+							}
+
 							configQueue := []string{}
+							var asts []*parser.VClusterAST
 
 							if c.String("config-dir") != "" {
 								configQueue = append(configQueue, c.String("config-dir"))
@@ -105,8 +120,28 @@ func main() {
 										continue
 									}
 
+									asts = append(asts, ast)
 									fmt.Printf("AST for '%s':\n%+v\n", config, ast)
 								}
+							}
+
+							// Start substrate with asts.
+							manager, err := substrate.NewManager(dbPath)
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "failed to create substrate manager: %s\n", err)
+								return nil
+							}
+							defer func(manager *substrate.Manager) {
+								err := manager.Close()
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "failed to close substrate manager: %s\n", err)
+								}
+							}(manager)
+
+							err = manager.StartServicesAndDependencies(asts)
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "failed to start services and dependencies: %s\n", err)
+								return nil
 							}
 
 							return nil
