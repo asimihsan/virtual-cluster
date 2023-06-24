@@ -1,10 +1,19 @@
+/*
+ * Copyright (c) 2023 Asim Ihsan.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0
+ */
+
 package substrate
 
 import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os/exec"
 	"sync"
 
 	"github.com/asimihsan/virtual-cluster/internal/parser"
@@ -70,7 +79,6 @@ func (m *Manager) StartServicesAndDependencies(asts []*parser.VClusterAST) error
 			fmt.Println("Starting service:", service.Name)
 			process := &ManagedProcess{
 				Name:        service.Name,
-				Cmd:         exec.Command("bash"),
 				RunCommands: service.RunCommands,
 				Stop:        make(chan struct{}),
 			}

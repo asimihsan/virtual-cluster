@@ -36,21 +36,21 @@ RUN for file in /app/grammar/*.g4; do \
     done
 
 # Build stage for Go
-FROM golang:1.20.5-bullseye as go-build
-WORKDIR /app
-COPY --from=antlr-build /app/generated /app/antlr/generated
-COPY go.mod go.sum ./
-RUN mount=type=cache,target=/go/pkg/mod \
-    go mod download
-
-COPY . .
-RUN go build -o virtual-cluster cmd/virtual-cluster/main.go
+#FROM golang:1.20.5-bullseye as go-build
+#WORKDIR /app
+#COPY --from=antlr-build /app/generated /app/antlr/generated
+#COPY go.mod go.sum ./
+#RUN mount=type=cache,target=/go/pkg/mod \
+#    go mod download
+#
+#COPY . .
+#RUN go build -o virtual-cluster cmd/virtual-cluster/main.go
 
 # Final stage
 FROM ubuntu:22.04
 RUN mount=type=cache,target=/var/cache/apt \
     apt-get update
 WORKDIR /app
-COPY --from=go-build /app/virtual-cluster /app/virtual-cluster
+#COPY --from=go-build /app/virtual-cluster /app/virtual-cluster
 COPY --from=antlr-build /app/generated /app/antlr/generated
-ENTRYPOINT ["/app/virtual-cluster"]
+#ENTRYPOINT ["/app/virtual-cluster"]

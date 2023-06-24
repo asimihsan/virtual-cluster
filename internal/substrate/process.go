@@ -1,74 +1,117 @@
+/*
+ * Copyright (c) 2023 Asim Ihsan.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0
+ */
+
 package substrate
 
 import (
+	"bufio"
 	"database/sql"
 	"fmt"
+	_ "github.com/mattn/go-sqlite3"
+	"io"
 	"log"
-	"os"
 	"os/exec"
 	"sync"
-	"time"
-
-	"github.com/Netflix/go-expect"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type ManagedProcess struct {
 	Name        string
-	Cmd         *exec.Cmd
 	RunCommands []string
 	Stop        chan struct{}
 }
 
 func runProcessAndStoreOutput(process *ManagedProcess, db *sql.DB) {
-	sqliteLineWriter := NewLineWriter(func(line string) {
+	outputCallback := func(line string) {
 		fmt.Println("Writing line to DB:", line)
 		_, err := db.Exec("INSERT INTO logs (process_name, output_type, content) VALUES (?, 'stdout', ?)", process.Name, line)
 		if err != nil {
 			log.Fatal(err)
 		}
-	})
-
-	fmt.Println("Creating console")
-	console, err := expect.NewConsole(
-		expect.WithLogger(log.New(os.Stdout, "", 0)),
-		expect.WithStdout(os.Stdout),
-		expect.WithStdout(sqliteLineWriter),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer console.Close()
-
-	cmd := exec.Command("bash")
-	cmd.Stdin = console.Tty()
-	cmd.Stdout = console.Tty()
-	cmd.Stderr = console.Tty()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	fmt.Println("Starting process")
-	err = cmd.Start()
-	if err != nil {
-		log.Fatal(err)
 	}
 
-	fmt.Println("Successfully started process, PID:", cmd.Process.Pid)
+	errorCallback := func(line string) {
+		fmt.Println("Writing error line to DB:", line)
+		_, err := db.Exec("INSERT INTO logs (process_name, output_type, content) VALUES (?, 'stderr', ?)", process.Name, line)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	for _, cmdStr := range process.RunCommands {
 		fmt.Println("Running command:", cmdStr)
-		time.Sleep(time.Second)
-		console.SendLine(cmdStr)
-		time.Sleep(time.Second)
+		err := runShellCommand(cmdStr, outputCallback, errorCallback)
+		if err != nil {
+			fmt.Println("Error occurred while running command:", cmdStr, "Error:", err)
+			break
+		}
 	}
+}
 
-	console.SendLine("exit")
+type OutputCallback func(string)
+type ErrorCallback func(string)
 
-	err = cmd.Wait()
+func runShellCommand(command string, outputCallback OutputCallback, errorCallback ErrorCallback) error {
+	cmd := exec.Command("bash", "-c", command)
+
+	stdoutReader, stdoutWriter := io.Pipe()
+	stderrReader, stderrWriter := io.Pipe()
+	cmd.Stdout = stdoutWriter
+	cmd.Stderr = stderrWriter
+
+	err := cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	wg.Wait() // Wait for the goroutine to exit
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer stdoutWriter.Close()
+		defer stderrWriter.Close()
+		err := cmd.Wait()
+		if err != nil {
+			errChan <- err
+		}
+		close(errChan)
+	}()
+
+	go func() {
+		readStream(stdoutReader, outputCallback, "stdout")
+		wg.Done()
+	}()
+
+	go func() {
+		readStream(stderrReader, errorCallback, "stderr")
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	select {
+	case err := <-errChan:
+		return err
+	default:
+		return nil
+	}
+}
+
+func readStream(reader io.Reader, callback func(string), streamType string) {
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text() + "\n"
+		callback(line)
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Printf("Error reading %s: %v\n", streamType, err)
+	}
 }
