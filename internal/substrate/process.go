@@ -31,7 +31,6 @@ func runProcessAndStoreOutput(
 	db *sql.DB,
 ) {
 	outputCallback := func(line string) {
-		fmt.Println("Writing line to DB:", line)
 		_, err := db.Exec("INSERT INTO logs (process_name, output_type, content) VALUES (?, 'stdout', ?)", process.Name, line)
 		if err != nil {
 			log.Fatal(err)
@@ -39,7 +38,6 @@ func runProcessAndStoreOutput(
 	}
 
 	errorCallback := func(line string) {
-		fmt.Println("Writing error line to DB:", line)
 		_, err := db.Exec("INSERT INTO logs (process_name, output_type, content) VALUES (?, 'stderr', ?)", process.Name, line)
 		if err != nil {
 			log.Fatal(err)

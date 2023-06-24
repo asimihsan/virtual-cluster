@@ -11,6 +11,7 @@
 package e2e
 
 import (
+	"fmt"
 	"github.com/asimihsan/virtual-cluster/internal/parser"
 	"github.com/asimihsan/virtual-cluster/internal/substrate"
 	"github.com/stretchr/testify/assert"
@@ -47,4 +48,8 @@ func TestHTTPService(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	manager.StopAllProcesses()
+
+	logs, err := manager.GetLogsForProcess("http_service", "stdout")
+	assert.NoError(t, err)
+	fmt.Println(logs)
 }
