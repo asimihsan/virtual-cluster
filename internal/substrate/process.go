@@ -20,9 +20,10 @@ import (
 )
 
 type ManagedProcess struct {
-	Name        string
-	RunCommands []string
-	Stop        chan struct{}
+	Name             string
+	RunCommands      []string
+	WorkingDirectory string
+	Stop             chan struct{}
 }
 
 func runProcessAndStoreOutput(
@@ -47,7 +48,13 @@ func runProcessAndStoreOutput(
 
 	for _, cmdStr := range process.RunCommands {
 		fmt.Println("Running command:", cmdStr)
-		err := runShellCommand(process.Stop, cmdStr, outputCallback, errorCallback)
+		err := runShellCommand(
+			process.Stop,
+			cmdStr,
+			process.WorkingDirectory,
+			outputCallback,
+			errorCallback,
+		)
 		if err != nil {
 			fmt.Println("Error occurred while running command:", cmdStr, "Error:", err)
 			break
@@ -61,10 +68,12 @@ type ErrorCallback func(string)
 func runShellCommand(
 	stop chan struct{},
 	command string,
+	workingDirectory string,
 	outputCallback OutputCallback,
 	errorCallback ErrorCallback,
 ) error {
 	cmd := exec.Command("bash", "-c", command)
+	cmd.Dir = workingDirectory
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

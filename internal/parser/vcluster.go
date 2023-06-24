@@ -24,6 +24,20 @@ type VClusterAST struct {
 	Dependencies []VClusterDependencyDefinitionAST
 }
 
+func (a VClusterAST) Validate() error {
+	for _, service := range a.Services {
+		if err := service.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, dependency := range a.Dependencies {
+		if err := dependency.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type VClusterServiceDefinitionAST struct {
 	Name         string
 	Repository   *string
@@ -34,6 +48,13 @@ type VClusterServiceDefinitionAST struct {
 	HealthChecks HealthCheck
 	Dependencies []VClusterDependency
 	RunCommands  []string
+}
+
+func (v *VClusterServiceDefinitionAST) Validate() error {
+	if v.Name == "" {
+		return fmt.Errorf("service name is empty")
+	}
+	return nil
 }
 
 type VClusterDependency struct {
@@ -48,6 +69,13 @@ type VClusterDependencyDefinitionAST struct {
 	Name         string
 	HealthChecks HealthCheck
 	Dependencies []VClusterDependency
+}
+
+func (v *VClusterDependencyDefinitionAST) Validate() error {
+	if v.Name == "" {
+		return fmt.Errorf("dependency name is empty")
+	}
+	return nil
 }
 
 type vclusterListener struct {
@@ -73,6 +101,9 @@ func (l *vclusterListener) EnterDependencyEntry(ctx *parser.DependencyEntryConte
 }
 
 func (l *vclusterListener) EnterServiceName(ctx *parser.ServiceNameContext) {
+	if ctx.IDENTIFIER() == nil {
+		return
+	}
 	serviceName := ctx.IDENTIFIER().GetText()
 	l.ast.Services[len(l.ast.Services)-1].Name = serviceName
 }
@@ -213,6 +244,10 @@ func ParseVCluster(input string) (*VClusterAST, error) {
 	}
 	if errorListener.error {
 		return nil, SyntaxErrors{Errors: errorListener.errors}
+	}
+
+	if err := listener.ast.Validate(); err != nil {
+		return nil, err
 	}
 
 	return listener.ast, nil

@@ -139,25 +139,43 @@ Using the virtual-cluster system, a developer can create a declarative test that
 
 ---
 
-## Solution Details
+### Milestone 1: Substrate Implementation
+1. (MVP done) Implement the manager in the substrate to run a service.
+2. Create a test HTTP service using github.com/labstack/echo/v4 and github.com/rs/zerolog/log for logging.
+3. Implement an HTTP proxy for capturing and forwarding traffic for observability.
+4. Test the substrate with the test HTTP service and the HTTP proxy. Write a VCluster file that tells the substrate to run this test service. Write an end-to-end test that uses the VCluster file. Run the service, send it HTTP traffic, ensure the proxy records the traffic, ensure stdout/stderr are captured.
 
-### Repository Structure
+### Milestone 2: Kafka Integration
+1. Research and understand Kafka producers and consumers.
+2. Update the test HTTP service to write a message to a Kafka topic with some new API.
+3. Create another test service that listens to the Kafka topic and logs the message to stdout.
+4. Implement a Kafka consumer for observability that listens to the same topic and logs the messages it receives.
+5. Test the Kafka integration with the test services and the Kafka consumer.
 
-The `virtual-cluster` project is the command-line tool.
+### Milestone 3: Declarative Testing Module
+1. Design and implement a framework for defining tests using a human-readable format.
+2. Develop a test execution component that interacts with the substrate and services to perform actions and validate responses.
+3. Implement a test reporting component that generates test reports and provides insights into test execution.
+4. Create and execute declarative tests for the test services from Milestones 1 and 2.
 
-Customers will create a config repo e.g. `virtual-cluster-config` that contains the following:
+### Milestone 4: Observability Module
+1. Implement log collection for all services and components.
+2. Implement trace collection for debugging purposes.
+3. Integrate with monitoring and alerting tools to provide real-time insights into the performance and health of the services.
+4. Test the observability module with the test services and proxies from previous milestones.
 
-- `.services`: A file listing the services, their repositories, branch/tag/commit, and directory within the repo (or root). This file will utilize a custom ANTLR-based DSL for consistency and ease of use.
+### Milestone 5: Custom DSLs and Configuration
+1. Design and implement custom DSLs for the .services and .vcluster files using the ANTLR framework.
+2. Implement configuration management for parsing and validating service configurations using custom DSLs.
+3. Update the substrate and test services to use the custom DSLs and configuration management.
+4. Test the custom DSLs and configuration management with the test services and proxies from previous milestones.
 
-Customers will create the following files in each of their service repositories:
+### Milestone 6: Documentation and Testing
+1. Write comprehensive documentation for the virtual-cluster project, covering usage, configuration, and customization.
+2. Create unit tests and integration tests for all components and modules.
+3. Perform end-to-end testing of the entire virtual-cluster system with the test services and proxies from previous milestones.
 
-- `.vcluster`: A file included in each service's repository containing information such as service dependencies, health check endpoints, startup sequences, and other necessary details. This file will also use a custom ANTLR-based DSL.
-
-### Custom DSLs
-The custom DSLs for the `.services` and `.vcluster` files will be created using the ANTLR (ANother Tool for Language Recognition) framework. This will ensure clear semantics and excellent static analysis capabilities. The DSL will be similar to HCL but have a strict lexical grammar to make static analysis and IDE auto-suggestion easier. The DSL must be easy to use, learn, and train for.
-
-### Log and Trace Collection
-To provide a seamless developer experience, `virtual-cluster` will collect logs and OTEL traces for efficient debugging. Instead of forwarding logs, the repository will run a local service responsible for collecting and analyzing logs and traces. This will ensure easy access to relevant information for developers.
-
-### Service Interaction
-In order to execute the `virtual-cluster`, Git submodules or cloning of the Git repositories for each service will be required. This will enable the repository to manage and interact with the individual services effectively.
+### Milestone 7: Finalization and Deployment
+1. Review and refine the implementation based on feedback and testing results.
+2. Optimize the performance and resource usage of the virtual-cluster system.
+3. Prepare the virtual-cluster project for deployment and distribution.

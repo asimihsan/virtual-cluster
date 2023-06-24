@@ -42,6 +42,19 @@ func TestParseVCluster_SingleServiceNoDependencies(t *testing.T) {
 	assert.Equal(t, expected, ast)
 }
 
+func TestParseVCluster_QuotedName_IsError(t *testing.T) {
+	input := `
+    service "my_service" {
+        health_check {
+            endpoint: "/health";
+        }
+    }
+    `
+
+	_, err := ParseVCluster(input)
+	assert.Error(t, err)
+}
+
 func TestParseVCluster_ServiceWithOneRunCommand(t *testing.T) {
 	input := `
     service my_service {

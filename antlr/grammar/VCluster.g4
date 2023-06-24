@@ -24,22 +24,24 @@ serviceName: IDENTIFIER;
 
 dependencyName: IDENTIFIER;
 
-serviceConfigItem: 'repository' ':' STRING_LITERAL ';'?  # serviceConfigRepository
-                 | 'branch' ':' STRING_LITERAL ';'?      # serviceConfigBranch
-                 | 'tag' ':' STRING_LITERAL ';'?         # serviceConfigTag
-                 | 'commit' ':' STRING_LITERAL ';'?      # serviceConfigCommit
-                 | 'directory' ':' STRING_LITERAL ';'?   # serviceConfigDirectory
+serviceConfigItem: 'repository' keyValueDelimiter STRING_LITERAL ';'?  # serviceConfigRepository
+                 | 'branch' keyValueDelimiter STRING_LITERAL ';'?      # serviceConfigBranch
+                 | 'tag' keyValueDelimiter STRING_LITERAL ';'?         # serviceConfigTag
+                 | 'commit' keyValueDelimiter STRING_LITERAL ';'?      # serviceConfigCommit
+                 | 'directory' keyValueDelimiter STRING_LITERAL ';'?   # serviceConfigDirectory
                  | 'health_check' '{' healthCheck+ '}'   # serviceConfigHealthCheck
-                 | 'dependency' ':' IDENTIFIER ';'?      # serviceConfigDependency
-                 | 'run_commands' ':' '[' STRING_LITERAL (',' STRING_LITERAL)* ','? ']' ';'?  # serviceConfigRunCommands
+                 | 'dependency' keyValueDelimiter IDENTIFIER ';'?      # serviceConfigDependency
+                 | 'run_commands' keyValueDelimiter '[' STRING_LITERAL (',' STRING_LITERAL)* ','? ']' ';'?  # serviceConfigRunCommands
                  ;
 
 dependencyConfigItem: 'health_check' '{' healthCheck+ '}'   # dependencyConfigHealthCheck
-                     | 'dependency' ':' IDENTIFIER ';'?     # dependencyConfigDependency
+                     | 'dependency' keyValueDelimiter IDENTIFIER ';'?     # dependencyConfigDependency
                      ;
 
-healthCheck: 'endpoint' ':' STRING_LITERAL ';'?         # healthCheckEndpoint
+healthCheck: 'endpoint' keyValueDelimiter STRING_LITERAL ';'?         # healthCheckEndpoint
            ;
+
+keyValueDelimiter: ':' | '=';
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]*;
 

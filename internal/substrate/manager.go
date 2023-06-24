@@ -13,11 +13,12 @@ package substrate
 import (
 	"database/sql"
 	"fmt"
-	"log"
-	"sync"
-
 	"github.com/asimihsan/virtual-cluster/internal/parser"
+	"github.com/asimihsan/virtual-cluster/internal/proxy"
 	_ "github.com/mattn/go-sqlite3"
+	"log"
+	"net/http"
+	"sync"
 )
 
 type Manager struct {
@@ -69,18 +70,27 @@ func topologicalSort(definitions []interface{}) ([]interface{}, error) {
 	return definitions, nil
 }
 
-func (m *Manager) StartServicesAndDependencies(asts []*parser.VClusterAST) error {
+func (m *Manager) StartServicesAndDependencies(
+	asts []*parser.VClusterAST,
+	workingDirectories map[string]string,
+) error {
 	// Combine and check for duplicate names
 	// Perform topological sort
 	// Start services and dependencies one at a time
 
 	for _, ast := range asts {
 		for _, service := range ast.Services {
+			workingDirectory, ok := workingDirectories[service.Name]
+			if !ok {
+				workingDirectory = "."
+			}
+
 			fmt.Println("Starting service:", service.Name)
 			process := &ManagedProcess{
-				Name:        service.Name,
-				RunCommands: service.RunCommands,
-				Stop:        make(chan struct{}, 1),
+				Name:             service.Name,
+				RunCommands:      service.RunCommands,
+				WorkingDirectory: workingDirectory,
+				Stop:             make(chan struct{}, 1),
 			}
 			m.processes = append(m.processes, process)
 			m.wg.Add(1)
@@ -124,4 +134,20 @@ func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]st
 	}
 
 	return logs, nil
+}
+
+func (m *Manager) RunHTTPProxy(target string, listenAddr string) error {
+	httpProxy, err := proxy.NewProxy(target)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		log.Printf("Starting HTTP proxy on %s", listenAddr)
+		if err := http.ListenAndServe(listenAddr, httpProxy); err != nil {
+			log.Printf("Error starting HTTP proxy: %v", err)
+		}
+	}()
+
+	return nil
 }
