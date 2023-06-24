@@ -80,22 +80,48 @@ func (m *Manager) StartServicesAndDependencies(asts []*parser.VClusterAST) error
 			process := &ManagedProcess{
 				Name:        service.Name,
 				RunCommands: service.RunCommands,
-				Stop:        make(chan struct{}),
+				Stop:        make(chan struct{}, 1),
 			}
 			m.processes = append(m.processes, process)
 			m.wg.Add(1)
+
 			go runProcessAndStoreOutput(process, m.db)
 			fmt.Println("Started service:", service.Name)
 		}
 	}
-
-	m.wg.Wait() // Wait for all processes to finish
 
 	return nil
 }
 
 func (m *Manager) StopAllProcesses() {
 	for _, process := range m.processes {
-		process.Stop <- struct{}{}
+		select {
+		case process.Stop <- struct{}{}:
+			// value sent successfully
+			fmt.Println("Sent stop signal to process:", process.Name)
+		default:
+			// channel is not ready to receive, handle the situation accordingly
+			fmt.Println("Channel not ready to receive for process:", process.Name)
+		}
 	}
+}
+
+func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]string, error) {
+	rows, err := m.db.Query("SELECT content FROM logs WHERE process_name = ? AND output_type = ?", processName, outputType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []string
+	for rows.Next() {
+		var content string
+		err = rows.Scan(&content)
+		if err != nil {
+			return nil, err
+		}
+		logs = append(logs, content)
+	}
+
+	return logs, nil
 }

@@ -40,8 +40,9 @@ func TestRunShellCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var output bytes.Buffer
 			var errOutput bytes.Buffer
+			stopChan := make(chan struct{})
 
-			err := runShellCommand(tt.command, func(line string) {
+			err := runShellCommand(stopChan, tt.command, func(line string) {
 				output.WriteString(line)
 			}, func(line string) {
 				errOutput.WriteString(line)

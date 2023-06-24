@@ -15,10 +15,8 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
-	"io"
 	"log"
 	"os/exec"
-	"sync"
 )
 
 type ManagedProcess struct {
@@ -27,7 +25,10 @@ type ManagedProcess struct {
 	Stop        chan struct{}
 }
 
-func runProcessAndStoreOutput(process *ManagedProcess, db *sql.DB) {
+func runProcessAndStoreOutput(
+	process *ManagedProcess,
+	db *sql.DB,
+) {
 	outputCallback := func(line string) {
 		fmt.Println("Writing line to DB:", line)
 		_, err := db.Exec("INSERT INTO logs (process_name, output_type, content) VALUES (?, 'stdout', ?)", process.Name, line)
@@ -46,7 +47,7 @@ func runProcessAndStoreOutput(process *ManagedProcess, db *sql.DB) {
 
 	for _, cmdStr := range process.RunCommands {
 		fmt.Println("Running command:", cmdStr)
-		err := runShellCommand(cmdStr, outputCallback, errorCallback)
+		err := runShellCommand(process.Stop, cmdStr, outputCallback, errorCallback)
 		if err != nil {
 			fmt.Println("Error occurred while running command:", cmdStr, "Error:", err)
 			break
@@ -57,56 +58,59 @@ func runProcessAndStoreOutput(process *ManagedProcess, db *sql.DB) {
 type OutputCallback func(string)
 type ErrorCallback func(string)
 
-func runShellCommand(command string, outputCallback OutputCallback, errorCallback ErrorCallback) error {
+func runShellCommand(
+	stop chan struct{},
+	command string,
+	outputCallback OutputCallback,
+	errorCallback ErrorCallback,
+) error {
 	cmd := exec.Command("bash", "-c", command)
 
-	stdoutReader, stdoutWriter := io.Pipe()
-	stderrReader, stderrWriter := io.Pipe()
-	cmd.Stdout = stdoutWriter
-	cmd.Stderr = stderrWriter
-
-	err := cmd.Start()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	errChan := make(chan error, 1)
-
-	go func() {
-		defer stdoutWriter.Close()
-		defer stderrWriter.Close()
-		err := cmd.Wait()
-		if err != nil {
-			errChan <- err
-		}
-		close(errChan)
-	}()
-
-	go func() {
-		readStream(stdoutReader, outputCallback, "stdout")
-		wg.Done()
-	}()
-
-	go func() {
-		readStream(stderrReader, errorCallback, "stderr")
-		wg.Done()
-	}()
-
-	wg.Wait()
-
-	select {
-	case err := <-errChan:
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
 		return err
-	default:
+	}
+
+	outputScanner := bufio.NewScanner(stdout)
+	go readStream(outputScanner, outputCallback, "stdout")
+
+	errorScanner := bufio.NewScanner(stderr)
+	go readStream(errorScanner, errorCallback, "stderr")
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	// Wait for the command to finish.
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	// Use select to listen to the Stop channel and pre-emptively stop the process
+	// if a signal is received.
+	select {
+	case <-stop:
+		if err := cmd.Process.Kill(); err != nil {
+			log.Fatal("failed to kill process: ", err)
+		}
+		log.Println("process killed as stop signal received")
 		return nil
+	case err := <-done:
+		return err
 	}
 }
 
-func readStream(reader io.Reader, callback func(string), streamType string) {
-	scanner := bufio.NewScanner(reader)
+func readStream(
+	scanner *bufio.Scanner,
+	callback func(string),
+	streamType string,
+) {
 	for scanner.Scan() {
 		line := scanner.Text() + "\n"
 		callback(line)
