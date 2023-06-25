@@ -22,6 +22,8 @@ func main() {
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.HideBanner = true
+	e.HidePort = true
 
 	e.GET("/", func(c echo.Context) error {
 		log.Info().Msg("Received request at /")

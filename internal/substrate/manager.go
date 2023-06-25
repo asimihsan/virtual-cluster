@@ -42,9 +42,25 @@ func NewManager(dbPath string) (*Manager, error) {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS logs (
 			id INTEGER PRIMARY KEY,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 			process_name TEXT,
 			output_type TEXT,
 			content TEXT
+		)
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS http_requests (
+			id INTEGER PRIMARY KEY,
+			process_name TEXT,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			method TEXT,
+			url TEXT,
+			headers TEXT,
+			body TEXT
 		)
 	`)
 	if err != nil {
@@ -97,6 +113,18 @@ func (m *Manager) StartServicesAndDependencies(
 
 			go runProcessAndStoreOutput(process, m.db)
 			fmt.Println("Started service:", service.Name)
+
+			if service.ServicePort != nil && service.ProxyPort != nil {
+				fmt.Println("Starting HTTP proxy for service:", service.Name)
+				err := m.RunHTTPProxy(
+					fmt.Sprintf("http://localhost:%d", *service.ServicePort),
+					fmt.Sprintf(":%d", *service.ProxyPort),
+					service.Name)
+				if err != nil {
+					return err
+				}
+				fmt.Println("Started HTTP proxy for service:", service.Name)
+			}
 		}
 	}
 
@@ -136,8 +164,42 @@ func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]st
 	return logs, nil
 }
 
-func (m *Manager) RunHTTPProxy(target string, listenAddr string) error {
-	httpProxy, err := proxy.NewProxy(target)
+type HTTPProxyRequest struct {
+	Timestamp string
+	Method    string
+	URL       string
+	Headers   string
+	Body      string
+}
+
+func (m *Manager) GetHTTPProxyRequestsForProcess(
+	processName string,
+) ([]*HTTPProxyRequest, error) {
+	rows, err := m.db.Query("SELECT timestamp, method, url, headers, body FROM http_requests WHERE process_name = ?", processName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var requests []*HTTPProxyRequest
+	for rows.Next() {
+		var request HTTPProxyRequest
+		err = rows.Scan(&request.Timestamp, &request.Method, &request.URL, &request.Headers, &request.Body)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, &request)
+	}
+
+	return requests, nil
+}
+
+func (m *Manager) RunHTTPProxy(
+	target string,
+	listenAddr string,
+	processName string,
+) error {
+	httpProxy, err := proxy.NewProxy(target, processName, m.db)
 	if err != nil {
 		return err
 	}

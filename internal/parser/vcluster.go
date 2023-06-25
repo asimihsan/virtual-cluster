@@ -46,6 +46,8 @@ type VClusterServiceDefinitionAST struct {
 	Commit       *string
 	Directory    *string
 	HealthChecks HealthCheck
+	ServicePort  *int
+	ProxyPort    *int
 	Dependencies []VClusterDependency
 	RunCommands  []string
 }
@@ -161,6 +163,32 @@ func (l *vclusterListener) EnterServiceConfigDirectory(ctx *parser.ServiceConfig
 func (l *vclusterListener) EnterServiceConfigHealthCheck(ctx *parser.ServiceConfigHealthCheckContext) {
 	healthCheck := HealthCheck{}
 	l.ast.Services[len(l.ast.Services)-1].HealthChecks = healthCheck
+}
+
+func (l *vclusterListener) EnterServiceConfigPort(ctx *parser.ServiceConfigPortContext) {
+	port := ctx.PORT()
+	if port == nil {
+		return
+	}
+	value, err := strconv.Atoi(port.GetText())
+	if err != nil {
+		l.error = err
+		return
+	}
+	l.ast.Services[len(l.ast.Services)-1].ServicePort = &value
+}
+
+func (l *vclusterListener) EnterServiceConfigProxyPort(ctx *parser.ServiceConfigProxyPortContext) {
+	port := ctx.PORT()
+	if port == nil {
+		return
+	}
+	value, err := strconv.Atoi(port.GetText())
+	if err != nil {
+		l.error = err
+		return
+	}
+	l.ast.Services[len(l.ast.Services)-1].ProxyPort = &value
 }
 
 func (l *vclusterListener) EnterServiceConfigDependency(ctx *parser.ServiceConfigDependencyContext) {}

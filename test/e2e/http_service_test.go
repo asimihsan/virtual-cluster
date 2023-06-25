@@ -11,14 +11,16 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/asimihsan/virtual-cluster/internal/parser"
-	"github.com/asimihsan/virtual-cluster/internal/substrate"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/asimihsan/virtual-cluster/internal/parser"
+	"github.com/asimihsan/virtual-cluster/internal/substrate"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHTTPService(t *testing.T) {
@@ -43,7 +45,8 @@ func TestHTTPService(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	resp, err := http.Get("http://localhost:1323")
+	endpoint := fmt.Sprintf("http://localhost:%d", *ast.Services[0].ProxyPort)
+	resp, err := http.Get(endpoint)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -51,5 +54,28 @@ func TestHTTPService(t *testing.T) {
 
 	logs, err := manager.GetLogsForProcess("http_service", "stdout")
 	assert.NoError(t, err)
-	fmt.Println(logs)
+
+	assert.Equal(t, 1, len(logs))
+
+	var logFields map[string]interface{}
+	err = json.Unmarshal([]byte(logs[0]), &logFields)
+	if err != nil {
+		t.Fatalf("failed to decode log as JSON: %v", err)
+	}
+
+	// get the fields
+	method := logFields["method"].(string)
+	uri := logFields["uri"].(string)
+	status := int(logFields["status"].(float64))
+
+	// assert the fields
+	assert.Equal(t, "GET", method)
+	assert.Equal(t, "/", uri)
+	assert.Equal(t, 200, status)
+
+	proxyRequests, err := manager.GetHTTPProxyRequestsForProcess("http_service")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(proxyRequests))
+	assert.Equal(t, "GET", proxyRequests[0].Method)
+	assert.Equal(t, "/", proxyRequests[0].URL)
 }

@@ -31,6 +31,8 @@ serviceConfigItem: 'repository' keyValueDelimiter STRING_LITERAL ';'?  # service
                  | 'directory' keyValueDelimiter STRING_LITERAL ';'?   # serviceConfigDirectory
                  | 'health_check' '{' healthCheck+ '}'   # serviceConfigHealthCheck
                  | 'dependency' keyValueDelimiter IDENTIFIER ';'?      # serviceConfigDependency
+                 | 'service_port' keyValueDelimiter PORT ';'?          # serviceConfigPort
+                 | 'proxy_port' keyValueDelimiter PORT ';'?            # serviceConfigProxyPort
                  | 'run_commands' keyValueDelimiter '[' STRING_LITERAL (',' STRING_LITERAL)* ','? ']' ';'?  # serviceConfigRunCommands
                  ;
 
@@ -44,10 +46,10 @@ healthCheck: 'endpoint' keyValueDelimiter STRING_LITERAL ';'?         # healthCh
 keyValueDelimiter: ':' | '=';
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]*;
-
 STRING_LITERAL: '"' (ESC|.)*? '"' | [a-zA-Z_][a-zA-Z_0-9.-]*;
 fragment
 ESC : '\\"' | '\\\\' ; // 2-char sequences \" and \\
+PORT : [0-9]+;
 
 WS: [ \t\r\n]+ -> skip;
 C_BLOCK_COMMENT: '/*' .*? '*/' -> skip;
