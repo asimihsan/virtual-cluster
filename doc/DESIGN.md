@@ -142,8 +142,8 @@ Using the virtual-cluster system, a developer can create a declarative test that
 ### Milestone 1: Substrate Implementation
 1. (MVP done) Implement the manager in the substrate to run a service.
 2. (done) Create a test HTTP service using github.com/labstack/echo/v4 and github.com/rs/zerolog/log for logging.
-3. Implement an HTTP proxy for capturing and forwarding traffic for observability.
-4. Test the substrate with the test HTTP service and the HTTP proxy. Write a VCluster file that tells the substrate to run this test service. Write an end-to-end test that uses the VCluster file. Run the service, send it HTTP traffic, ensure the proxy records the traffic, ensure stdout/stderr are captured.
+3. (done) Implement an HTTP proxy for capturing and forwarding traffic for observability.
+4. (done) Test the substrate with the test HTTP service and the HTTP proxy. Write a VCluster file that tells the substrate to run this test service. Write an end-to-end test that uses the VCluster file. Run the service, send it HTTP traffic, ensure the proxy records the traffic, ensure stdout/stderr are captured.
 
 ### Milestone 2: Kafka Integration
 1. Research and understand Kafka producers and consumers.
