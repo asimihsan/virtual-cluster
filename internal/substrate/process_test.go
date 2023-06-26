@@ -42,11 +42,17 @@ func TestRunShellCommand(t *testing.T) {
 			var errOutput bytes.Buffer
 			stopChan := make(chan struct{})
 
-			err := runShellCommand(stopChan, tt.command, func(line string) {
-				output.WriteString(line)
-			}, func(line string) {
-				errOutput.WriteString(line)
-			})
+			err := runShellCommand(
+				stopChan,
+				tt.command,
+				".", /* working directory */
+				func(line string) {
+					output.WriteString(line)
+				},
+				func(line string) {
+					errOutput.WriteString(line)
+				},
+			)
 
 			if err != nil && tt.expectedError == nil {
 				t.Fatalf("unexpected error: %v", err)

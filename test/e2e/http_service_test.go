@@ -34,12 +34,13 @@ func TestHTTPService(t *testing.T) {
 	assert.NoError(t, err)
 	defer manager.Close()
 
-	workingDirectories := make(map[string]string)
-	workingDirectories["http_service"] = "./test_services/http_service"
+	err = manager.AddWorkingDirectory("http_service", "./test_services/http_service")
+	if err != nil {
+		t.Fatalf("failed to add working directory: %v", err)
+	}
 
 	err = manager.StartServicesAndDependencies(
 		[]*parser.VClusterAST{ast},
-		workingDirectories,
 	)
 	assert.NoError(t, err)
 

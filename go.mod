@@ -6,6 +6,7 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/mattn/go-sqlite3 v1.14.17
+	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.29.1
 	github.com/stretchr/testify v1.8.2
 )

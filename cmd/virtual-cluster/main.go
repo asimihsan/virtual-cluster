@@ -17,6 +17,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func main() {
@@ -46,6 +47,11 @@ func main() {
 								Name:  "db-path",
 								Usage: "filepath to database",
 							},
+							&cli.StringSliceFlag{
+								Name:    "working-dir",
+								Aliases: []string{"w"},
+								Usage:   "working directory for a service, specified as key=value, e.g. service=~/service",
+							},
 						},
 						Action: func(c *cli.Context) error {
 							dbPath := c.String("db-path")
@@ -67,6 +73,20 @@ func main() {
 
 							if c.String("config-file") != "" {
 								configQueue = append(configQueue, c.String("config-file"))
+							}
+
+							workingDirsInput := c.StringSlice("working-dir")
+							workingDirs := make(map[string]string)
+							for _, wd := range workingDirsInput {
+								kv := strings.SplitN(wd, "=", 2)
+								if len(kv) != 2 {
+									fmt.Fprintf(os.Stderr, "failed to parse working-dir '%s'\n", wd)
+									return nil
+								}
+
+								serviceName := kv[0]
+								serviceDir := strings.Trim(kv[1], "\"")
+								workingDirs[serviceName] = serviceDir
 							}
 
 							for {
@@ -137,6 +157,14 @@ func main() {
 									fmt.Fprintf(os.Stderr, "failed to close substrate manager: %s\n", err)
 								}
 							}(manager)
+
+							for service, wd := range workingDirs {
+								err := manager.AddWorkingDirectory(service, wd)
+								if err != nil {
+									fmt.Fprintf(os.Stderr, "failed to add working directory '%s' for service '%s': %s\n", wd, service, err)
+									return nil
+								}
+							}
 
 							err = manager.StartServicesAndDependencies(asts)
 							if err != nil {

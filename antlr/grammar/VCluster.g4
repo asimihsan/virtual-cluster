@@ -13,12 +13,12 @@ grammar VCluster;
 vclusterConfig: configEntry+ EOF;
 
 configEntry: serviceEntry
-           | dependencyEntry
+           | managedDependencyEntry
            ;
 
 serviceEntry: 'service' serviceName '{' serviceConfigItem+ '}';
 
-dependencyEntry: 'dependency' dependencyName '{' dependencyConfigItem+ '}';
+managedDependencyEntry: 'managed_dependency' dependencyName '{' managedDependencyConfigItem+ '}';
 
 serviceName: IDENTIFIER;
 
@@ -36,10 +36,10 @@ serviceConfigItem: 'repository' keyValueDelimiter STRING_LITERAL ';'?  # service
                  | 'run_commands' keyValueDelimiter '[' STRING_LITERAL (',' STRING_LITERAL)* ','? ']' ';'?  # serviceConfigRunCommands
                  ;
 
-dependencyConfigItem: 'health_check' '{' healthCheck+ '}'   # dependencyConfigHealthCheck
-                     | 'dependency' keyValueDelimiter IDENTIFIER ';'?     # dependencyConfigDependency
-                     | 'managed_kafka' '{' managedKafkaConfigItem+ '}'    # dependencyConfigManagedKafka
-                     ;
+managedDependencyConfigItem:
+                   'dependency' keyValueDelimiter IDENTIFIER ';'?     # managedDependencyConfigDependency
+                 | 'managed_kafka' '{' managedKafkaConfigItem+ '}'    # managedDependencyConfigManagedKafka
+                 ;
 
 healthCheck: 'endpoint' keyValueDelimiter STRING_LITERAL ';'?         # healthCheckEndpoint
            ;

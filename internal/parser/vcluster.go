@@ -20,8 +20,8 @@ import (
 )
 
 type VClusterAST struct {
-	Services     []VClusterServiceDefinitionAST
-	Dependencies []VClusterDependencyDefinitionAST
+	Services            []VClusterServiceDefinitionAST
+	ManagedDependencies []VClusterManagedDependencyDefinitionAST
 }
 
 func (a VClusterAST) Validate() error {
@@ -30,7 +30,7 @@ func (a VClusterAST) Validate() error {
 			return err
 		}
 	}
-	for _, dependency := range a.Dependencies {
+	for _, dependency := range a.ManagedDependencies {
 		if err := dependency.Validate(); err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ type HealthCheck struct {
 	Endpoint string
 }
 
-type VClusterDependencyDefinitionAST struct {
+type VClusterManagedDependencyDefinitionAST struct {
 	Name         string
 	HealthChecks HealthCheck
 	Dependencies []VClusterDependency
@@ -78,7 +78,7 @@ type ManagedKafka struct {
 	Port int
 }
 
-func (v *VClusterDependencyDefinitionAST) Validate() error {
+func (v *VClusterManagedDependencyDefinitionAST) Validate() error {
 	if v.Name == "" {
 		return fmt.Errorf("dependency name is empty")
 	}
@@ -102,9 +102,9 @@ func (l *vclusterListener) EnterServiceEntry(ctx *parser.ServiceEntryContext) {
 	l.ast.Services = append(l.ast.Services, serviceConfig)
 }
 
-func (l *vclusterListener) EnterDependencyEntry(ctx *parser.DependencyEntryContext) {
-	dependencyConfig := VClusterDependencyDefinitionAST{}
-	l.ast.Dependencies = append(l.ast.Dependencies, dependencyConfig)
+func (l *vclusterListener) EnterDependencyEntry(ctx *parser.ManagedDependencyEntryContext) {
+	dependencyConfig := VClusterManagedDependencyDefinitionAST{}
+	l.ast.ManagedDependencies = append(l.ast.ManagedDependencies, dependencyConfig)
 }
 
 func (l *vclusterListener) EnterServiceName(ctx *parser.ServiceNameContext) {
@@ -117,7 +117,7 @@ func (l *vclusterListener) EnterServiceName(ctx *parser.ServiceNameContext) {
 
 func (l *vclusterListener) EnterDependencyName(ctx *parser.DependencyNameContext) {
 	dependencyName := ctx.IDENTIFIER().GetText()
-	l.ast.Dependencies[len(l.ast.Dependencies)-1].Name = dependencyName
+	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].Name = dependencyName
 }
 
 func (l *vclusterListener) EnterServiceConfigRepository(ctx *parser.ServiceConfigRepositoryContext) {
@@ -198,14 +198,9 @@ func (l *vclusterListener) EnterServiceConfigProxyPort(ctx *parser.ServiceConfig
 
 func (l *vclusterListener) EnterServiceConfigDependency(ctx *parser.ServiceConfigDependencyContext) {}
 
-func (l *vclusterListener) EnterDependencyConfigHealthCheck(ctx *parser.DependencyConfigHealthCheckContext) {
-	healthCheck := HealthCheck{}
-	l.ast.Dependencies[len(l.ast.Dependencies)-1].HealthChecks = healthCheck
-}
-
-func (l *vclusterListener) EnterDependencyConfigDependency(ctx *parser.DependencyConfigDependencyContext) {
+func (l *vclusterListener) EnterDependencyConfigDependency(ctx *parser.ManagedDependencyConfigDependencyContext) {
 	dependency := VClusterDependency{}
-	l.ast.Dependencies[len(l.ast.Dependencies)-1].Dependencies = append(l.ast.Dependencies[len(l.ast.Dependencies)-1].Dependencies, dependency)
+	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].Dependencies = append(l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].Dependencies, dependency)
 }
 
 func (l *vclusterListener) EnterHealthCheckEndpoint(ctx *parser.HealthCheckEndpointContext) {
@@ -231,9 +226,9 @@ func (l *vclusterListener) EnterServiceConfigRunCommands(ctx *parser.ServiceConf
 }
 
 // EnterDependencyConfigManagedKafka is called when production dependencyConfigManagedKafka is entered.
-func (l *vclusterListener) EnterDependencyConfigManagedKafka(ctx *parser.DependencyConfigManagedKafkaContext) {
+func (l *vclusterListener) EnterDependencyConfigManagedKafka(ctx *parser.ManagedDependencyConfigManagedKafkaContext) {
 	managedKafka := &ManagedKafka{}
-	l.ast.Dependencies[len(l.ast.Dependencies)-1].ManagedKafka = managedKafka
+	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].ManagedKafka = managedKafka
 }
 
 // EnterManagedKafkaConfigPort is called when production managedKafkaConfigPort is entered.
@@ -247,7 +242,7 @@ func (l *vclusterListener) EnterManagedKafkaConfigPort(ctx *parser.ManagedKafkaC
 		l.error = err
 		return
 	}
-	l.ast.Dependencies[len(l.ast.Dependencies)-1].ManagedKafka.Port = value
+	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].ManagedKafka.Port = value
 }
 
 type vclusterErrorListenerType struct {

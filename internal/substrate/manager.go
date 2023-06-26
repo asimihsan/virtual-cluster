@@ -16,16 +16,19 @@ import (
 	"github.com/asimihsan/virtual-cluster/internal/parser"
 	"github.com/asimihsan/virtual-cluster/internal/proxy"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/pkg/errors"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 )
 
 type Manager struct {
-	dbPath    string
-	db        *sql.DB
-	processes []*ManagedProcess
-	wg        sync.WaitGroup
+	dbPath             string
+	db                 *sql.DB
+	processes          []*ManagedProcess
+	workingDirectories map[string]string
+	wg                 sync.WaitGroup
 }
 
 func NewManager(dbPath string) (*Manager, error) {
@@ -67,10 +70,32 @@ func NewManager(dbPath string) (*Manager, error) {
 		return nil, err
 	}
 
+	workingDirectories := make(map[string]string)
+
 	return &Manager{
-		dbPath: dbPath,
-		db:     db,
+		dbPath:             dbPath,
+		db:                 db,
+		workingDirectories: workingDirectories,
 	}, nil
+}
+
+func (m *Manager) AddWorkingDirectory(serviceName, path string) error {
+	if _, ok := m.workingDirectories[serviceName]; ok {
+		return fmt.Errorf("service name already exists: %s", serviceName)
+	}
+	if path == "" {
+		return fmt.Errorf("path is empty")
+	}
+	stat, err := os.Stat(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to stat path: %s", path)
+	}
+	if !stat.IsDir() {
+		return fmt.Errorf("path is not a directory: %s", path)
+	}
+
+	m.workingDirectories[serviceName] = path
+	return nil
 }
 
 func (m *Manager) Close() error {
@@ -78,7 +103,7 @@ func (m *Manager) Close() error {
 	return m.db.Close()
 }
 
-// takes the combined slice of VClusterServiceDefinitionAST and VClusterDependencyDefinitionAST and
+// takes the combined slice of VClusterServiceDefinitionAST and VClusterManagedDependencyDefinitionAST and
 // performs a topological sort.
 func topologicalSort(definitions []interface{}) ([]interface{}, error) {
 	// Perform topological sort on the combined slice
@@ -88,7 +113,6 @@ func topologicalSort(definitions []interface{}) ([]interface{}, error) {
 
 func (m *Manager) StartServicesAndDependencies(
 	asts []*parser.VClusterAST,
-	workingDirectories map[string]string,
 ) error {
 	// Combine and check for duplicate names
 	// Perform topological sort
@@ -96,7 +120,7 @@ func (m *Manager) StartServicesAndDependencies(
 
 	for _, ast := range asts {
 		for _, service := range ast.Services {
-			workingDirectory, ok := workingDirectories[service.Name]
+			workingDirectory, ok := m.workingDirectories[service.Name]
 			if !ok {
 				workingDirectory = "."
 			}
