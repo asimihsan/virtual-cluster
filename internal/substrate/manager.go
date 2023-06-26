@@ -11,16 +11,20 @@
 package substrate
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"github.com/asimihsan/virtual-cluster/internal/dependencies/kafka"
 	"github.com/asimihsan/virtual-cluster/internal/parser"
 	"github.com/asimihsan/virtual-cluster/internal/proxy"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"log"
 	"net/http"
 	"os"
-	"sync"
+	"path/filepath"
 )
 
 type Manager struct {
@@ -28,7 +32,6 @@ type Manager struct {
 	db                 *sql.DB
 	processes          []*ManagedProcess
 	workingDirectories map[string]string
-	wg                 sync.WaitGroup
 }
 
 func NewManager(dbPath string) (*Manager, error) {
@@ -119,6 +122,15 @@ func (m *Manager) StartServicesAndDependencies(
 	// Start services and dependencies one at a time
 
 	for _, ast := range asts {
+		for _, managedDependency := range ast.ManagedDependencies {
+			if managedDependency.ManagedKafka != nil {
+				err := m.StartManagedKafka(managedDependency.Name, managedDependency.ManagedKafka.Port)
+				if err != nil {
+					return errors.Wrapf(err, "failed to start managed kafka: %s", managedDependency.Name)
+				}
+			}
+		}
+
 		for _, service := range ast.Services {
 			workingDirectory, ok := m.workingDirectories[service.Name]
 			if !ok {
@@ -133,7 +145,6 @@ func (m *Manager) StartServicesAndDependencies(
 				Stop:             make(chan struct{}, 1),
 			}
 			m.processes = append(m.processes, process)
-			m.wg.Add(1)
 
 			go runProcessAndStoreOutput(process, m.db)
 			fmt.Println("Started service:", service.Name)
@@ -151,6 +162,46 @@ func (m *Manager) StartServicesAndDependencies(
 			}
 		}
 	}
+
+	return nil
+}
+
+func (m *Manager) StartManagedKafka(
+	managedDependencyName string,
+	port int,
+) error {
+	dir, err := os.MkdirTemp("", "kafka")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temporary directory")
+	}
+
+	dockerComposeFile, err := kafka.GenerateDockerComposeFile(port)
+	if err != nil {
+		return errors.Wrap(err, "failed to generate docker compose file")
+	}
+
+	composeFilePath := filepath.Join(dir, "docker-compose.yml")
+	if err := os.WriteFile(composeFilePath, []byte(dockerComposeFile), 0644); err != nil {
+		return errors.Wrap(err, "failed to write docker compose file")
+	}
+
+	fmt.Printf("Docker compose file location: %s\n", composeFilePath)
+
+	fmt.Println("Cleaning up containers")
+	cleanupContainers("broker1245")
+	cleanupContainers("kowl12345")
+
+	fmt.Println("Starting managed dependency:", managedDependencyName)
+	workingDirectory := filepath.Dir(composeFilePath)
+	process := &ManagedProcess{
+		Name:             managedDependencyName,
+		RunCommands:      []string{"docker compose up --no-color --timestamps"},
+		WorkingDirectory: workingDirectory,
+		Stop:             make(chan struct{}, 1),
+	}
+	m.processes = append(m.processes, process)
+	go runProcessAndStoreOutput(process, m.db)
+	fmt.Println("Started managed dependency:", managedDependencyName)
 
 	return nil
 }
@@ -236,4 +287,27 @@ func (m *Manager) RunHTTPProxy(
 	}()
 
 	return nil
+}
+
+func cleanupContainers(containerName string) {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, container := range containers {
+		if container.Names[0] == "/"+containerName {
+			fmt.Printf("Removing container %s\n", container.ID)
+			err := cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
 }

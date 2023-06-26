@@ -120,6 +120,7 @@ func readStream(
 ) {
 	for scanner.Scan() {
 		line := scanner.Text() + "\n"
+		fmt.Printf("%s: %s", streamType, line)
 		callback(line)
 	}
 	if err := scanner.Err(); err != nil {

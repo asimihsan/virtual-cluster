@@ -144,6 +144,7 @@ Using the virtual-cluster system, a developer can create a declarative test that
 2. (done) Create a test HTTP service using github.com/labstack/echo/v4 and github.com/rs/zerolog/log for logging.
 3. (done) Implement an HTTP proxy for capturing and forwarding traffic for observability.
 4. (done) Test the substrate with the test HTTP service and the HTTP proxy. Write a VCluster file that tells the substrate to run this test service. Write an end-to-end test that uses the VCluster file. Run the service, send it HTTP traffic, ensure the proxy records the traffic, ensure stdout/stderr are captured.
+5. Update HTTP proxy to record both HTTP requests and corresponding HTTP responses (with body and status code and headers)
 
 ### Milestone 2: Kafka Integration
 1. Implement a managed Kafka dependency that developers can specify using the 'dependency' type in the VCluster file. Use a Mustache-templated docker-compose.yml file to run Kafka in kraft mode with configurable ports.

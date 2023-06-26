@@ -1,0 +1,22 @@
+service http_service_with_kafka {
+  repository = "https://github.com/yourusername/test_services"
+  branch = "main"
+  directory = "http_service_with_kafka"
+  health_check {
+    endpoint = "/ping"
+  }
+  service_port = 1323
+  proxy_port = 1324
+
+  dependency = kafka
+
+  run_commands = [
+    "go run main.go"
+  ]
+}
+
+managed_dependency kafka {
+    managed_kafka {
+        port = 9091
+    }
+}
