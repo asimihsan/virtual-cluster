@@ -71,6 +71,11 @@ type VClusterDependencyDefinitionAST struct {
 	Name         string
 	HealthChecks HealthCheck
 	Dependencies []VClusterDependency
+	ManagedKafka *ManagedKafka
+}
+
+type ManagedKafka struct {
+	Port int
 }
 
 func (v *VClusterDependencyDefinitionAST) Validate() error {
@@ -223,6 +228,26 @@ func (l *vclusterListener) EnterServiceConfigRunCommands(ctx *parser.ServiceConf
 		value := utils.HandleStringLiteral(runCommand.GetText())
 		l.ast.Services[len(l.ast.Services)-1].RunCommands = append(l.ast.Services[len(l.ast.Services)-1].RunCommands, value)
 	}
+}
+
+// EnterDependencyConfigManagedKafka is called when production dependencyConfigManagedKafka is entered.
+func (l *vclusterListener) EnterDependencyConfigManagedKafka(ctx *parser.DependencyConfigManagedKafkaContext) {
+	managedKafka := &ManagedKafka{}
+	l.ast.Dependencies[len(l.ast.Dependencies)-1].ManagedKafka = managedKafka
+}
+
+// EnterManagedKafkaConfigPort is called when production managedKafkaConfigPort is entered.
+func (l *vclusterListener) EnterManagedKafkaConfigPort(ctx *parser.ManagedKafkaConfigPortContext) {
+	port := ctx.PORT()
+	if port == nil {
+		return
+	}
+	value, err := strconv.Atoi(port.GetText())
+	if err != nil {
+		l.error = err
+		return
+	}
+	l.ast.Dependencies[len(l.ast.Dependencies)-1].ManagedKafka.Port = value
 }
 
 type vclusterErrorListenerType struct {

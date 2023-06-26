@@ -38,10 +38,14 @@ serviceConfigItem: 'repository' keyValueDelimiter STRING_LITERAL ';'?  # service
 
 dependencyConfigItem: 'health_check' '{' healthCheck+ '}'   # dependencyConfigHealthCheck
                      | 'dependency' keyValueDelimiter IDENTIFIER ';'?     # dependencyConfigDependency
+                     | 'managed_kafka' '{' managedKafkaConfigItem+ '}'    # dependencyConfigManagedKafka
                      ;
 
 healthCheck: 'endpoint' keyValueDelimiter STRING_LITERAL ';'?         # healthCheckEndpoint
            ;
+
+managedKafkaConfigItem: 'port' keyValueDelimiter PORT ';'?            # managedKafkaConfigPort
+                       ;
 
 keyValueDelimiter: ':' | '=';
 

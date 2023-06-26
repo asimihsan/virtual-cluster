@@ -146,11 +146,11 @@ Using the virtual-cluster system, a developer can create a declarative test that
 4. (done) Test the substrate with the test HTTP service and the HTTP proxy. Write a VCluster file that tells the substrate to run this test service. Write an end-to-end test that uses the VCluster file. Run the service, send it HTTP traffic, ensure the proxy records the traffic, ensure stdout/stderr are captured.
 
 ### Milestone 2: Kafka Integration
-1. Research and understand Kafka producers and consumers.
-2. Update the test HTTP service to write a message to a Kafka topic with some new API.
-3. Create another test service that listens to the Kafka topic and logs the message to stdout.
-4. Implement a Kafka consumer for observability that listens to the same topic and logs the messages it receives.
-5. Test the Kafka integration with the test services and the Kafka consumer.
+1. Implement a managed Kafka dependency that developers can specify using the 'dependency' type in the VCluster file. Use a Mustache-templated docker-compose.yml file to run Kafka in kraft mode with configurable ports.
+3. Update the test HTTP service to write a message to a Kafka topic with some new API.
+4. Create another test service that listens to the Kafka topic and logs the message to stdout.
+5. Implement a Kafka consumer for observability (similar to the existing HTTP proxy) that listens to the same topic and logs the messages it receives.
+6Test the Kafka integration with the test services and the Kafka consumer.
 
 ### Milestone 3: Declarative Testing Module
 1. Design and implement a framework for defining tests using a human-readable format.
