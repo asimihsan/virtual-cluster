@@ -55,7 +55,8 @@ func main() {
 				config.Producer.Return.Successes = true
 				producer, err := sarama.NewSyncProducer([]string{kafkaBroker}, config)
 				if err != nil {
-					log.Fatal().Err(err).Msg("Failed to create Kafka producer")
+					log.Error().Err(err).Msg("Failed to create Kafka producer")
+					return c.String(http.StatusInternalServerError, "Failed to create Kafka producer")
 				}
 				defer func() {
 					if err := producer.Close(); err != nil {

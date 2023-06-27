@@ -26,12 +26,10 @@ func StatUpward(relPath string, verbose bool) (os.FileInfo, string, error) {
 		stat, err := os.Stat(testPath)
 		if err == nil {
 			return stat, testPath, nil
-		} else {
-			if verbose {
-				errorsEncountered = append(errorsEncountered, fmt.Sprintf("Error at %s: %v", testPath, err))
-			}
 		}
-
+		if verbose {
+			errorsEncountered = append(errorsEncountered, fmt.Sprintf("Error at %s: %v", testPath, err))
+		}
 		if absPath == filepath.Dir(absPath) {
 			break
 		}
