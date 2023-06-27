@@ -221,6 +221,12 @@ func (m *Manager) StartManagedKafka(
 	go runProcessAndStoreOutput(process, m.db, m.verbose)
 	fmt.Println("Started managed dependency:", managedDependencyName)
 
+	kw := utils.NewKafkaWaiter(fmt.Sprintf("localhost:%d", port))
+	err = kw.Wait()
+	if err != nil {
+		return errors.Wrap(err, "failed to wait for kafka")
+	}
+
 	return nil
 }
 
@@ -292,7 +298,12 @@ func (m *Manager) RunHTTPProxy(
 	listenAddr string,
 	processName string,
 ) error {
-	httpProxy, err := proxy.NewProxy(target, processName, m.db)
+	var proxyOptions []proxy.ProxyOption
+	if m.verbose {
+		proxyOptions = append(proxyOptions, proxy.WithVerbose(true))
+	}
+
+	httpProxy, err := proxy.NewProxy(target, processName, m.db, proxyOptions...)
 	if err != nil {
 		return err
 	}

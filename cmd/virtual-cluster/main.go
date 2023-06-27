@@ -12,12 +12,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+
 	"github.com/asimihsan/virtual-cluster/internal/parser"
 	"github.com/asimihsan/virtual-cluster/internal/substrate"
 	"github.com/urfave/cli/v2"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func main() {
@@ -51,6 +54,11 @@ func main() {
 								Name:    "working-dir",
 								Aliases: []string{"w"},
 								Usage:   "working directory for a service, specified as key=value, e.g. service=~/service",
+							},
+							&cli.BoolFlag{
+								Name:    "verbose",
+								Aliases: []string{"v"},
+								Usage:   "verbose output",
 							},
 						},
 						Action: func(c *cli.Context) error {
@@ -146,7 +154,11 @@ func main() {
 							}
 
 							// Start substrate with asts.
-							manager, err := substrate.NewManager(dbPath)
+							var opts []substrate.ManagerOption
+							if c.Bool("verbose") {
+								opts = append(opts, substrate.WithVerbose())
+							}
+							manager, err := substrate.NewManager(dbPath, opts...)
 							if err != nil {
 								fmt.Fprintf(os.Stderr, "failed to create substrate manager: %s\n", err)
 								return nil
@@ -170,6 +182,20 @@ func main() {
 							if err != nil {
 								fmt.Fprintf(os.Stderr, "failed to start services and dependencies: %s\n", err)
 								return nil
+							}
+
+							fmt.Println("Started")
+
+							// Wait for SIGTERM signal and gracefully close manager on receipt
+							sigterm := make(chan os.Signal, 1)
+							signal.Notify(sigterm, syscall.SIGTERM)
+							<-sigterm
+
+							fmt.Println("Stopping...")
+
+							err = manager.Close()
+							if err != nil {
+								fmt.Fprintf(os.Stderr, "failed to close substrate manager: %s\n", err)
 							}
 
 							return nil
