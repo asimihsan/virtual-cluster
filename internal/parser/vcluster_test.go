@@ -141,3 +141,33 @@ func TestParseVCluster_ServiceWithNoRunCommands(t *testing.T) {
 	_, err := ParseVCluster(input)
 	assert.Error(t, err)
 }
+
+func TestParseVCluster_ServiceWithManagedKafka(t *testing.T) {
+	input := `
+service http_service_with_kafka {
+  repository = "https://github.com/yourusername/test_services"
+  branch = "main"
+  directory = "http_service_with_kafka"
+  health_check {
+    endpoint = "/ping"
+  }
+  service_port = 1323
+  proxy_port = 1324
+
+  dependency = kafka
+
+  run_commands = [
+    "go run main.go"
+  ]
+}
+
+managed_dependency kafka {
+    managed_kafka {
+        port = 9091
+    }
+}
+`
+
+	_, err := ParseVCluster(input)
+	assert.NoError(t, err)
+}

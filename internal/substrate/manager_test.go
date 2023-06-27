@@ -98,8 +98,6 @@ func TestStartAndStopManagedKafka(t *testing.T) {
 	fmt.Println("Managed Kafka dependency started")
 
 	// Wait for a short period to allow the managed Kafka dependency to start
-	time.Sleep(5 * time.Second)
-
 	kw := utils.NewKafkaWaiter("localhost:9095")
 	err = kw.Wait()
 	assert.NoError(t, err)

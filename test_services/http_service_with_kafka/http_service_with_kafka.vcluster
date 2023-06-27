@@ -17,6 +17,6 @@ service http_service_with_kafka {
 
 managed_dependency kafka {
     managed_kafka {
-        port = 9091
+        port = 9095
     }
 }

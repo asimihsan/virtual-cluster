@@ -24,7 +24,7 @@ import (
 )
 
 func TestHTTPService(t *testing.T) {
-	vclusterContent, err := os.ReadFile("./test_services/http_service/http_service.vcluster")
+	vclusterContent, err := os.ReadFile("./test_services/http_service/http_service_with_kafka.vcluster")
 	assert.NoError(t, err)
 
 	ast, err := parser.ParseVCluster(string(vclusterContent))
@@ -34,7 +34,7 @@ func TestHTTPService(t *testing.T) {
 	assert.NoError(t, err)
 	defer manager.Close()
 
-	err = manager.AddWorkingDirectory("http_service", "./test_services/http_service")
+	err = manager.AddWorkingDirectoryUpward("http_service", "./test_services/http_service", true /*verbose*/)
 	if err != nil {
 		t.Fatalf("failed to add working directory: %v", err)
 	}

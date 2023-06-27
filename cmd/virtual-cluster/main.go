@@ -159,7 +159,7 @@ func main() {
 							}(manager)
 
 							for service, wd := range workingDirs {
-								err := manager.AddWorkingDirectory(service, wd)
+								err := manager.AddWorkingDirectoryUpward(service, wd, false /*verbose*/)
 								if err != nil {
 									fmt.Fprintf(os.Stderr, "failed to add working directory '%s' for service '%s': %s\n", wd, service, err)
 									return nil

@@ -102,7 +102,7 @@ func (l *vclusterListener) EnterServiceEntry(ctx *parser.ServiceEntryContext) {
 	l.ast.Services = append(l.ast.Services, serviceConfig)
 }
 
-func (l *vclusterListener) EnterDependencyEntry(ctx *parser.ManagedDependencyEntryContext) {
+func (l *vclusterListener) EnterManagedDependencyEntry(ctx *parser.ManagedDependencyEntryContext) {
 	dependencyConfig := VClusterManagedDependencyDefinitionAST{}
 	l.ast.ManagedDependencies = append(l.ast.ManagedDependencies, dependencyConfig)
 }
@@ -226,7 +226,7 @@ func (l *vclusterListener) EnterServiceConfigRunCommands(ctx *parser.ServiceConf
 }
 
 // EnterDependencyConfigManagedKafka is called when production dependencyConfigManagedKafka is entered.
-func (l *vclusterListener) EnterDependencyConfigManagedKafka(ctx *parser.ManagedDependencyConfigManagedKafkaContext) {
+func (l *vclusterListener) EnterManagedDependencyConfigManagedKafka(ctx *parser.ManagedDependencyConfigManagedKafkaContext) {
 	managedKafka := &ManagedKafka{}
 	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].ManagedKafka = managedKafka
 }

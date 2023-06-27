@@ -8,6 +8,8 @@ services:
     container_name: broker1245
     ports:
       - "{{ kafka_port }}:{{ kafka_port }}"
+    networks:
+      - my_custom_network
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
@@ -36,5 +38,11 @@ services:
       - "8080:8080"
     depends_on:
       - broker
+    networks:
+      - my_custom_network
     environment:
       - KAFKA_BROKERS=broker:29092
+
+networks:
+  my_custom_network:
+    name: my_custom_network

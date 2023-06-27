@@ -29,8 +29,12 @@ type ManagedProcess struct {
 func runProcessAndStoreOutput(
 	process *ManagedProcess,
 	db *sql.DB,
+	verbose bool,
 ) {
 	outputCallback := func(line string) {
+		if verbose {
+			fmt.Printf("%s: %s", process.Name, line)
+		}
 		_, err := db.Exec("INSERT INTO logs (process_name, output_type, content) VALUES (?, 'stdout', ?)", process.Name, line)
 		if err != nil {
 			log.Fatal(err)
@@ -38,6 +42,9 @@ func runProcessAndStoreOutput(
 	}
 
 	errorCallback := func(line string) {
+		if verbose {
+			fmt.Printf("%s: %s", process.Name, line)
+		}
 		_, err := db.Exec("INSERT INTO logs (process_name, output_type, content) VALUES (?, 'stderr', ?)", process.Name, line)
 		if err != nil {
 			log.Fatal(err)
@@ -120,7 +127,6 @@ func readStream(
 ) {
 	for scanner.Scan() {
 		line := scanner.Text() + "\n"
-		fmt.Printf("%s: %s", streamType, line)
 		callback(line)
 	}
 	if err := scanner.Err(); err != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/asimihsan/virtual-cluster/internal/dependencies/kafka"
 	"github.com/asimihsan/virtual-cluster/internal/parser"
 	"github.com/asimihsan/virtual-cluster/internal/proxy"
+	"github.com/asimihsan/virtual-cluster/internal/utils"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	_ "github.com/mattn/go-sqlite3"
@@ -32,9 +33,18 @@ type Manager struct {
 	db                 *sql.DB
 	processes          []*ManagedProcess
 	workingDirectories map[string]string
+	verbose            bool
 }
 
-func NewManager(dbPath string) (*Manager, error) {
+type ManagerOption func(*Manager)
+
+func WithVerbose() ManagerOption {
+	return func(m *Manager) {
+		m.verbose = true
+	}
+}
+
+func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
@@ -75,29 +85,36 @@ func NewManager(dbPath string) (*Manager, error) {
 
 	workingDirectories := make(map[string]string)
 
-	return &Manager{
+	manager := &Manager{
 		dbPath:             dbPath,
 		db:                 db,
 		workingDirectories: workingDirectories,
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(manager)
+	}
+
+	return manager, nil
 }
 
-func (m *Manager) AddWorkingDirectory(serviceName, path string) error {
+func (m *Manager) AddWorkingDirectoryUpward(serviceName, path string, verbose bool) error {
 	if _, ok := m.workingDirectories[serviceName]; ok {
 		return fmt.Errorf("service name already exists: %s", serviceName)
 	}
 	if path == "" {
 		return fmt.Errorf("path is empty")
 	}
-	stat, err := os.Stat(path)
+
+	stat, foundPath, err := utils.StatUpward(path, verbose)
 	if err != nil {
 		return errors.Wrapf(err, "failed to stat path: %s", path)
 	}
 	if !stat.IsDir() {
-		return fmt.Errorf("path is not a directory: %s", path)
+		return fmt.Errorf("path is not a directory: %s", foundPath)
 	}
 
-	m.workingDirectories[serviceName] = path
+	m.workingDirectories[serviceName] = foundPath
 	return nil
 }
 
@@ -146,7 +163,7 @@ func (m *Manager) StartServicesAndDependencies(
 			}
 			m.processes = append(m.processes, process)
 
-			go runProcessAndStoreOutput(process, m.db)
+			go runProcessAndStoreOutput(process, m.db, m.verbose)
 			fmt.Println("Started service:", service.Name)
 
 			if service.ServicePort != nil && service.ProxyPort != nil {
@@ -190,6 +207,7 @@ func (m *Manager) StartManagedKafka(
 	fmt.Println("Cleaning up containers")
 	cleanupContainers("broker1245")
 	cleanupContainers("kowl12345")
+	cleanupNetworks("my_custom_network")
 
 	fmt.Println("Starting managed dependency:", managedDependencyName)
 	workingDirectory := filepath.Dir(composeFilePath)
@@ -200,7 +218,7 @@ func (m *Manager) StartManagedKafka(
 		Stop:             make(chan struct{}, 1),
 	}
 	m.processes = append(m.processes, process)
-	go runProcessAndStoreOutput(process, m.db)
+	go runProcessAndStoreOutput(process, m.db, m.verbose)
 	fmt.Println("Started managed dependency:", managedDependencyName)
 
 	return nil
@@ -289,16 +307,16 @@ func (m *Manager) RunHTTPProxy(
 	return nil
 }
 
-func cleanupContainers(containerName string) {
+func cleanupContainers(containerName string) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "failed to create docker client")
 	}
 
 	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "failed to list containers")
 	}
 
 	for _, container := range containers {
@@ -306,8 +324,35 @@ func cleanupContainers(containerName string) {
 			fmt.Printf("Removing container %s\n", container.ID)
 			err := cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
-				panic(err)
+				return errors.Wrap(err, "failed to remove container "+container.ID)
 			}
 		}
 	}
+
+	return nil
+}
+
+func cleanupNetworks(networkName string) error {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return errors.Wrap(err, "failed to create docker client")
+	}
+
+	networks, err := cli.NetworkList(ctx, types.NetworkListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "failed to list networks")
+	}
+
+	for _, network := range networks {
+		if network.Name == networkName {
+			fmt.Printf("Removing network %s\n", network.ID)
+			err := cli.NetworkRemove(ctx, network.ID)
+			if err != nil {
+				return errors.Wrap(err, "failed to remove network "+network.ID)
+			}
+		}
+	}
+
+	return nil
 }

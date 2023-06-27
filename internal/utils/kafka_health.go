@@ -30,7 +30,7 @@ func NewKafkaWaiter(broker string, opts ...KafkaWaiterOption) *KafkaWaiter {
 	kw := &KafkaWaiter{
 		broker:   broker,
 		interval: 1 * time.Second,
-		timeout:  5 * time.Second,
+		timeout:  10 * time.Second,
 	}
 
 	for _, opt := range opts {
@@ -47,16 +47,16 @@ func (kw *KafkaWaiter) Wait() error {
 	ticker := time.NewTicker(kw.interval)
 	defer ticker.Stop()
 
+	var healthy bool
+	var lastErr error
+
 	for {
 		select {
 		case <-timeoutTimer.C:
 			return errors.New("kafka broker still unhealthy after timeout")
 		case <-ticker.C:
-			healthy, err := IsKafkaHealthy(kw.broker)
-			if err != nil {
-				return err
-			}
-			if healthy {
+			healthy, lastErr = IsKafkaHealthy(kw.broker, kw.interval)
+			if lastErr == nil && healthy {
 				return nil
 			}
 		}
@@ -66,9 +66,9 @@ func (kw *KafkaWaiter) Wait() error {
 // IsKafkaHealthy checks if the Kafka broker is healthy.
 func IsKafkaHealthy(
 	broker string,
+	timeout time.Duration,
 ) (bool, error) {
 	config := sarama.NewConfig()
-	timeout := 5 * time.Second
 	config.Net.DialTimeout = timeout
 	config.Net.ReadTimeout = timeout
 	config.Net.WriteTimeout = timeout
