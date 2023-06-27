@@ -42,25 +42,26 @@ func main() {
 			e.HideBanner = true
 			e.HidePort = true
 
-			// Initialize Kafka producer
-			config := sarama.NewConfig()
-			config.Producer.Return.Successes = true
-			producer, err := sarama.NewSyncProducer([]string{c.String("kafka-broker")}, config)
-			if err != nil {
-				log.Fatal().Err(err).Msg("Failed to create Kafka producer")
-			}
-			defer func() {
-				if err := producer.Close(); err != nil {
-					log.Error().Err(err).Msg("Failed to close Kafka producer")
-				}
-			}()
-
 			// Initialize atomic counter
 			var counter int64 = 0
+			kafkaBroker := c.String("kafka-broker")
 
 			// Define POST endpoint
 			e.POST("/kafka", func(c echo.Context) error {
 				log.Info().Msg("Received request at /kafka")
+
+				// Initialize Kafka producer
+				config := sarama.NewConfig()
+				config.Producer.Return.Successes = true
+				producer, err := sarama.NewSyncProducer([]string{kafkaBroker}, config)
+				if err != nil {
+					log.Fatal().Err(err).Msg("Failed to create Kafka producer")
+				}
+				defer func() {
+					if err := producer.Close(); err != nil {
+						log.Error().Err(err).Msg("Failed to close Kafka producer")
+					}
+				}()
 
 				// Increment counter
 				value := atomic.AddInt64(&counter, 1)
@@ -68,7 +69,7 @@ func main() {
 
 				// Send message to Kafka
 				message := fmt.Sprintf("Message %d", value)
-				_, _, err := producer.SendMessage(&sarama.ProducerMessage{
+				_, _, err = producer.SendMessage(&sarama.ProducerMessage{
 					Topic: "my-topic",
 					Value: sarama.StringEncoder(message),
 				})
@@ -92,7 +93,7 @@ func main() {
 			})
 
 			go func() {
-				kw := utils.NewKafkaWaiter(c.String("kafka-broker"))
+				kw := utils.NewKafkaWaiter(kafkaBroker)
 				if err := kw.Wait(); err != nil {
 					log.Warn().Err(err).Msg("Failed to wait for Kafka")
 				}

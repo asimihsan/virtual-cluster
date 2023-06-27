@@ -13,8 +13,8 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/asimihsan/virtual-cluster/internal/utils"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -24,7 +24,7 @@ import (
 )
 
 func TestHTTPService(t *testing.T) {
-	vclusterContent, err := os.ReadFile("./test_services/http_service/http_service_with_kafka.vcluster")
+	vclusterContent, err := utils.ReadFileUpward("./test_services/http_service/http_service.vcluster", true /*verbose*/)
 	assert.NoError(t, err)
 
 	ast, err := parser.ParseVCluster(string(vclusterContent))

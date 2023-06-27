@@ -53,9 +53,21 @@ func TestHTTPServiceWithKafka(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
+	// Send GET to /ping without proxy
+	endpoint := fmt.Sprintf("http://localhost:%d/ping", *ast.Services[0].ServicePort)
+	resp, err := http.Get(endpoint)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Send GET to /ping with proxy
+	endpoint = fmt.Sprintf("http://localhost:%d/ping", *ast.Services[0].ProxyPort)
+	resp, err = http.Get(endpoint)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
 	// Send a POST request to the /kafka endpoint
-	endpoint := fmt.Sprintf("http://localhost:%d/kafka", *ast.Services[0].ProxyPort)
-	resp, err := http.Post(endpoint, "application/json", nil)
+	endpoint = fmt.Sprintf("http://localhost:%d/kafka", *ast.Services[0].ProxyPort)
+	resp, err = http.Post(endpoint, "application/json", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
