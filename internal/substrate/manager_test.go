@@ -12,6 +12,7 @@ package substrate_test
 
 import (
 	"fmt"
+	"github.com/asimihsan/virtual-cluster/internal/utils"
 	"strings"
 	"testing"
 	"time"
@@ -99,7 +100,9 @@ func TestStartAndStopManagedKafka(t *testing.T) {
 	// Wait for a short period to allow the managed Kafka dependency to start
 	time.Sleep(5 * time.Second)
 
-	// ...
+	kw := utils.NewKafkaWaiter("localhost:9095")
+	err = kw.Wait()
+	assert.NoError(t, err)
 
 	// Stop the managed Kafka dependency
 	fmt.Println("Stopping managed Kafka dependency")
