@@ -1,0 +1,22 @@
+---
+version: '2'
+services:
+
+  localstack:
+    container_name: localstack_main
+    image: localstack/localstack
+    ports:
+      - "127.0.0.1:{{ localstack_port }}:{{ localstack_port }}"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+    networks:
+      - localstack_default
+    environment:
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "./volume:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+networks:
+  localstack_default:
+    name: localstack_default

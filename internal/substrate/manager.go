@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/asimihsan/virtual-cluster/internal/dependencies/kafka"
+	"github.com/asimihsan/virtual-cluster/internal/dependencies/localstack"
 	"github.com/asimihsan/virtual-cluster/internal/parser"
 	"github.com/asimihsan/virtual-cluster/internal/proxy"
 	"github.com/asimihsan/virtual-cluster/internal/utils"
@@ -145,7 +146,15 @@ func (m *Manager) StartServicesAndDependencies(
 				if err != nil {
 					return errors.Wrapf(err, "failed to start managed kafka: %s", managedDependency.Name)
 				}
+			} else if managedDependency.ManagedLocalstack != nil {
+				err := m.StartManagedLocalstack(managedDependency.Name, managedDependency.ManagedLocalstack.Port)
+				if err != nil {
+					return errors.Wrapf(err, "failed to start managed localstack: %s", managedDependency.Name)
+				}
+			} else {
+				return fmt.Errorf("unknown managed dependency type: %s", managedDependency.Name)
 			}
+
 		}
 
 		for _, service := range ast.Services {
@@ -225,6 +234,52 @@ func (m *Manager) StartManagedKafka(
 	err = kw.Wait()
 	if err != nil {
 		return errors.Wrap(err, "failed to wait for kafka")
+	}
+
+	return nil
+}
+
+func (m *Manager) StartManagedLocalstack(
+	managedDependencyName string,
+	port int,
+) error {
+	dir, err := os.MkdirTemp("", "localstack")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temporary directory")
+	}
+
+	dockerComposeFile, err := localstack.GenerateDockerComposeFile(port)
+	if err != nil {
+		return errors.Wrap(err, "failed to generate docker compose file")
+	}
+
+	composeFilePath := filepath.Join(dir, "docker-compose.yml")
+	if err := os.WriteFile(composeFilePath, []byte(dockerComposeFile), 0644); err != nil {
+		return errors.Wrap(err, "failed to write docker compose file")
+	}
+
+	fmt.Printf("Docker compose file location: %s\n", composeFilePath)
+
+	fmt.Println("Cleaning up containers")
+	cleanupContainers("localstack_main")
+	cleanupNetworks("localstack_default")
+
+	fmt.Println("Starting managed dependency:", managedDependencyName)
+	workingDirectory := filepath.Dir(composeFilePath)
+	process := &ManagedProcess{
+		Name:             managedDependencyName,
+		RunCommands:      []string{"docker compose up --no-color --timestamps"},
+		WorkingDirectory: workingDirectory,
+		Stop:             make(chan struct{}, 1),
+	}
+	m.processes = append(m.processes, process)
+	go runProcessAndStoreOutput(process, m.db, m.verbose)
+	fmt.Println("Started managed dependency:", managedDependencyName)
+
+	localstackWaiter := utils.NewLocalStackWaiter(fmt.Sprintf("http://localhost:%d", port))
+	err = localstackWaiter.Wait()
+	if err != nil {
+		return errors.Wrap(err, "failed to wait for localstack")
 	}
 
 	return nil

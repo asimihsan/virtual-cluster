@@ -68,13 +68,18 @@ type HealthCheck struct {
 }
 
 type VClusterManagedDependencyDefinitionAST struct {
-	Name         string
-	HealthChecks HealthCheck
-	Dependencies []VClusterDependency
-	ManagedKafka *ManagedKafka
+	Name              string
+	HealthChecks      HealthCheck
+	Dependencies      []VClusterDependency
+	ManagedKafka      *ManagedKafka
+	ManagedLocalstack *ManagedLocalstack
 }
 
 type ManagedKafka struct {
+	Port int
+}
+
+type ManagedLocalstack struct {
 	Port int
 }
 
@@ -243,6 +248,24 @@ func (l *vclusterListener) EnterManagedKafkaConfigPort(ctx *parser.ManagedKafkaC
 		return
 	}
 	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].ManagedKafka.Port = value
+}
+
+func (l *vclusterListener) EnterManagedDependencyConfigManagedLocalstack(ctx *parser.ManagedDependencyConfigManagedLocalstackContext) {
+	managedLocalstack := &ManagedLocalstack{}
+	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].ManagedLocalstack = managedLocalstack
+}
+
+func (l *vclusterListener) EnterManagedLocalstackConfigPort(ctx *parser.ManagedLocalstackConfigPortContext) {
+	port := ctx.PORT()
+	if port == nil {
+		return
+	}
+	value, err := strconv.Atoi(port.GetText())
+	if err != nil {
+		l.error = err
+		return
+	}
+	l.ast.ManagedDependencies[len(l.ast.ManagedDependencies)-1].ManagedLocalstack.Port = value
 }
 
 type vclusterErrorListenerType struct {

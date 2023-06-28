@@ -20,3 +20,9 @@ managed_dependency kafka {
         port = 9095
     }
 }
+
+managed_dependency localstack {
+    managed_localstack {
+        port = 4566
+    }
+}

@@ -39,6 +39,7 @@ serviceConfigItem: 'repository' keyValueDelimiter STRING_LITERAL ';'?  # service
 managedDependencyConfigItem:
                    'dependency' keyValueDelimiter IDENTIFIER ';'?     # managedDependencyConfigDependency
                  | 'managed_kafka' '{' managedKafkaConfigItem+ '}'    # managedDependencyConfigManagedKafka
+                 | 'managed_localstack' '{' managedLocalstackConfigItem '}'                      # managedDependencyConfigManagedLocalstack
                  ;
 
 healthCheck: 'endpoint' keyValueDelimiter STRING_LITERAL ';'?         # healthCheckEndpoint
@@ -46,6 +47,9 @@ healthCheck: 'endpoint' keyValueDelimiter STRING_LITERAL ';'?         # healthCh
 
 managedKafkaConfigItem: 'port' keyValueDelimiter PORT ';'?            # managedKafkaConfigPort
                        ;
+
+managedLocalstackConfigItem: 'port' keyValueDelimiter PORT ';'?       # managedLocalstackConfigPort
+                            ;
 
 keyValueDelimiter: ':' | '=';
 
