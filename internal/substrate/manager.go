@@ -13,20 +13,25 @@ package substrate
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/asimihsan/virtual-cluster/internal/dependencies/kafka"
 	"github.com/asimihsan/virtual-cluster/internal/dependencies/localstack"
 	"github.com/asimihsan/virtual-cluster/internal/parser"
 	"github.com/asimihsan/virtual-cluster/internal/proxy"
 	"github.com/asimihsan/virtual-cluster/internal/utils"
+	"github.com/asimihsan/virtual-cluster/internal/websocket"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Manager struct {
@@ -35,6 +40,12 @@ type Manager struct {
 	processes          []*ManagedProcess
 	workingDirectories map[string]string
 	verbose            bool
+	httpPort           int
+	websocket          *websocket.Broadcaster
+}
+
+func (m *Manager) Websocket() *websocket.Broadcaster {
+	return m.websocket
 }
 
 type ManagerOption func(*Manager)
@@ -42,6 +53,12 @@ type ManagerOption func(*Manager)
 func WithVerbose() ManagerOption {
 	return func(m *Manager) {
 		m.verbose = true
+	}
+}
+
+func WithHTTPPort(port int) ManagerOption {
+	return func(m *Manager) {
+		m.httpPort = port
 	}
 }
 
@@ -90,11 +107,30 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 		dbPath:             dbPath,
 		db:                 db,
 		workingDirectories: workingDirectories,
+		websocket:          websocket.NewBroadcaster(),
+		httpPort:           1371,
 	}
 
 	for _, opt := range opts {
 		opt(manager)
 	}
+
+	go func() {
+		e := echo.New()
+		e.HideBanner = true
+		e.HidePort = true
+		e.Use(middleware.Logger())
+		e.Use(middleware.Recover())
+		e.GET("/ws", func(c echo.Context) error {
+			websocket.WebSocketHandler(manager.Websocket()).ServeHTTP(c.Response(), c.Request())
+			return nil
+		})
+		manager.BroadcastLogsAndRequests()
+		err := e.Start(fmt.Sprintf(":%d", manager.httpPort))
+		if err != nil {
+			log.Printf("failed to start http server: %s", err)
+		}
+	}()
 
 	return manager, nil
 }
@@ -316,6 +352,83 @@ func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]st
 	}
 
 	return logs, nil
+}
+
+func (m *Manager) BroadcastLogsAndRequests() {
+	go func() {
+		var lastLogID, lastRequestID int
+		for {
+			// Query logs
+			rows, err := m.db.Query(`SELECT id, timestamp, process_name, output_type, content FROM logs WHERE id > ? ORDER BY id ASC LIMIT 100`, lastLogID)
+			if err != nil {
+				log.Printf("error querying logs: %v", err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			for rows.Next() {
+				var id int
+				var timestamp time.Time
+				var processName, outputType, content string
+				err = rows.Scan(&id, &timestamp, &processName, &outputType, &content)
+				if err != nil {
+					log.Printf("error scanning log row: %v", err)
+					continue
+				}
+
+				lastLogID = id
+				message, _ := json.Marshal(map[string]interface{}{
+					"type":         "log",
+					"timestamp":    timestamp,
+					"process_name": processName,
+					"output_type":  outputType,
+					"content":      content,
+				})
+				m.websocket.Broadcast(message)
+			}
+			err = rows.Close()
+			if err != nil {
+				log.Printf("error closing rows for logs: %v", err)
+			}
+
+			// Query HTTP requests
+			rows, err = m.db.Query(`SELECT id, process_name, timestamp, method, url, headers, body FROM http_requests WHERE id > ? ORDER BY id ASC LIMIT 100`, lastRequestID)
+			if err != nil {
+				log.Printf("error querying http_requests: %v", err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			for rows.Next() {
+				var id int
+				var timestamp time.Time
+				var processName, method, url, headers, body string
+				err = rows.Scan(&id, &timestamp, &processName, &method, &url, &headers, &body)
+				if err != nil {
+					log.Printf("error scanning http_request row: %v", err)
+					continue
+				}
+
+				lastRequestID = id
+				message, _ := json.Marshal(map[string]interface{}{
+					"type":         "http_request",
+					"timestamp":    timestamp,
+					"process_name": processName,
+					"method":       method,
+					"url":          url,
+					"headers":      headers,
+					"body":         body,
+				})
+				m.websocket.Broadcast(message)
+			}
+			err = rows.Close()
+			if err != nil {
+				log.Printf("error closing rows for http_requests: %v", err)
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}()
 }
 
 type HTTPProxyRequest struct {

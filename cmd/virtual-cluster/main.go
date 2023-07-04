@@ -60,6 +60,11 @@ func main() {
 								Aliases: []string{"v"},
 								Usage:   "verbose output",
 							},
+							&cli.IntFlag{
+								Name:    "manager-port",
+								Aliases: []string{"p"},
+								Usage:   "manager port, default 1371",
+							},
 						},
 						Action: func(c *cli.Context) error {
 							dbPath := c.String("db-path")
@@ -158,6 +163,11 @@ func main() {
 							if c.Bool("verbose") {
 								opts = append(opts, substrate.WithVerbose())
 							}
+							if c.Int("manager-port") != 0 {
+								opts = append(opts, substrate.WithHTTPPort(c.Int("manager-port")))
+							} else {
+								opts = append(opts, substrate.WithHTTPPort(1371))
+							}
 							manager, err := substrate.NewManager(dbPath, opts...)
 							if err != nil {
 								fmt.Fprintf(os.Stderr, "failed to create substrate manager: %s\n", err)
@@ -184,7 +194,7 @@ func main() {
 								return nil
 							}
 
-							fmt.Println("Started")
+							fmt.Println("Started services and dependencies")
 
 							// Wait for SIGTERM signal and gracefully close manager on receipt
 							sigterm := make(chan os.Signal, 1)

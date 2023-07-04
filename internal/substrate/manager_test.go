@@ -13,7 +13,7 @@ package substrate_test
 import (
 	"fmt"
 	"github.com/asimihsan/virtual-cluster/internal/utils"
-	"strings"
+	"golang.org/x/net/websocket"
 	"testing"
 	"time"
 
@@ -22,10 +22,44 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type LogMessage struct {
+	Content     string `json:"content"`
+	OutputType  string `json:"output_type"`
+	ProcessName string `json:"process_name"`
+	Timestamp   string `json:"timestamp"`
+	Type        string `json:"type"`
+}
+
 func TestStartAndStopSingleService(t *testing.T) {
 	// Create a new Manager with a temporary SQLite database
-	manager, err := substrate.NewManager(":memory:")
+	manager, err := substrate.NewManager(
+		":memory:",
+		substrate.WithHTTPPort(1371),
+	)
 	assert.NoError(t, err)
+
+	// Connect to Websocket broadcast
+	ws, err := websocket.Dial("ws://localhost:1371/ws", "", "http://localhost/")
+	assert.NoError(t, err)
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatalf("failed to close websocket: %v", err)
+		}
+	}(ws)
+
+	// Gather broadcasted messages into a slice
+	broadcastedMessages := make([]*LogMessage, 0)
+	go func() {
+		for {
+			var message LogMessage
+			err := websocket.JSON.Receive(ws, &message)
+			if err != nil {
+				return
+			}
+			broadcastedMessages = append(broadcastedMessages, &message)
+		}
+	}()
 
 	// Define a simple service that runs forever using a bash command
 	service := &parser.VClusterServiceDefinitionAST{
@@ -50,17 +84,16 @@ func TestStartAndStopSingleService(t *testing.T) {
 
 	// Check if the service is actually running by looking for the "Service started" message in the output
 	fmt.Println("Checking if service is running")
-	outputFound := false
 	logs, err := manager.GetLogsForProcess("test-service", "stdout")
 	assert.NoError(t, err)
-	for _, content := range logs {
-		fmt.Println("Found log:", content)
-		if strings.Contains(content, "Service started") {
-			outputFound = true
-			break
-		}
-	}
-	assert.True(t, outputFound, "Expected 'Service started' message not found in the output")
+	assert.Equal(t, 1, len(logs))
+	assert.Equal(t, "Service started\n", logs[0])
+
+	assert.Equal(t, 1, len(broadcastedMessages))
+	assert.Equal(t, "Service started\n", broadcastedMessages[0].Content)
+	assert.Equal(t, "stdout", broadcastedMessages[0].OutputType)
+	assert.Equal(t, "test-service", broadcastedMessages[0].ProcessName)
+	assert.Equal(t, "log", broadcastedMessages[0].Type)
 
 	// Stop the service
 	fmt.Println("Stopping service")
