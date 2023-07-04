@@ -89,8 +89,8 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS http_requests (
 			id INTEGER PRIMARY KEY,
-			process_name TEXT,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			process_name TEXT,
 			method TEXT,
 			url TEXT,
 			headers TEXT,
@@ -392,7 +392,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 			}
 
 			// Query HTTP requests
-			rows, err = m.db.Query(`SELECT id, process_name, timestamp, method, url, headers, body FROM http_requests WHERE id > ? ORDER BY id ASC LIMIT 100`, lastRequestID)
+			rows, err = m.db.Query(`SELECT id, timestamp, process_name, method, url, headers, body FROM http_requests WHERE id > ? ORDER BY id ASC LIMIT 100`, lastRequestID)
 			if err != nil {
 				log.Printf("error querying http_requests: %v", err)
 				time.Sleep(1 * time.Second)

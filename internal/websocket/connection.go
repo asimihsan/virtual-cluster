@@ -48,7 +48,7 @@ func (c *Client) ReadPump() {
 	}(c.conn)
 	for {
 		var msg []byte
-		err := websocket.Message.Receive(c.conn, &msg)
+		err := websocket.JSON.Receive(c.conn, &msg)
 		if err != nil {
 			log.Printf("error: %v", err)
 			break
@@ -73,7 +73,7 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			err := websocket.Message.Send(c.conn, message)
+			err := websocket.JSON.Send(c.conn, message)
 			if err != nil {
 				log.Printf("error: %v", err)
 				return
