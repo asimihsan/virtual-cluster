@@ -89,6 +89,8 @@ func main() {
 							}
 
 							workingDirsInput := c.StringSlice("working-dir")
+							fmt.Printf("working dirs input: %+v\n", workingDirsInput)
+
 							workingDirs := make(map[string]string)
 							for _, wd := range workingDirsInput {
 								kv := strings.SplitN(wd, "=", 2)
@@ -100,6 +102,10 @@ func main() {
 								serviceName := kv[0]
 								serviceDir := strings.Trim(kv[1], "\"")
 								workingDirs[serviceName] = serviceDir
+							}
+							fmt.Printf("working dirs:\n")
+							for k, v := range workingDirs {
+								fmt.Printf("  %s: %s\n", k, v)
 							}
 
 							for {

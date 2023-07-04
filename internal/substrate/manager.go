@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/Shopify/sarama"
 	"github.com/asimihsan/virtual-cluster/internal/dependencies/kafka"
 	"github.com/asimihsan/virtual-cluster/internal/dependencies/localstack"
 	"github.com/asimihsan/virtual-cluster/internal/parser"
@@ -95,6 +96,20 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 			url TEXT,
 			headers TEXT,
 			body TEXT
+		)
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS kafka_messages (
+			id INTEGER PRIMARY KEY,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			broker_name TEXT,
+			topic_name TEXT,
+			message_key TEXT,
+			message_value TEXT
 		)
 	`)
 	if err != nil {
@@ -275,6 +290,69 @@ func (m *Manager) StartManagedKafka(
 	return nil
 }
 
+func (m *Manager) ConsumeAndStoreKafkaMessages(brokerName string, port int) error {
+	config := sarama.NewConfig()
+	config.Consumer.Return.Errors = true
+
+	// Connect to the Kafka broker
+	broker := fmt.Sprintf("%s:%d", brokerName, port)
+	kafkaClient, err := sarama.NewClient([]string{broker}, config)
+	if err != nil {
+		return err
+	}
+	defer func(kafkaClient sarama.Client) {
+		err := kafkaClient.Close()
+		if err != nil {
+			fmt.Println("failed to close kafka client:", err)
+		}
+	}(kafkaClient)
+
+	// Keep track of the topics we're already consuming
+	consumingTopics := make(map[string]bool)
+
+	for {
+		// Get the list of topics
+		topics, err := kafkaClient.Topics()
+		if err != nil {
+			return err
+		}
+
+		// For each topicName, if we're not already consuming it, start a consumer
+		for _, topicName := range topics {
+			if consumingTopics[topicName] {
+				continue
+			}
+
+			consumingTopics[topicName] = true
+
+			consumer, err := sarama.NewConsumerFromClient(kafkaClient)
+			if err != nil {
+				return err
+			}
+
+			partitionConsumer, err := consumer.ConsumePartition(topicName, 0, sarama.OffsetOldest)
+			if err != nil {
+				return err
+			}
+
+			topic := topicName
+			go func() {
+				for message := range partitionConsumer.Messages() {
+					// For each message, store it in the SQLite database
+					_, err := m.db.Exec("INSERT INTO kafka_messages (broker_name, topic_name, message_key, message_value, timestamp) VALUES (?, ?, ?, ?, ?)",
+						brokerName, topic, string(message.Key), string(message.Value), message.Timestamp)
+					if err != nil {
+						log.Printf("Failed to insert message into database: %v", err)
+					}
+				}
+			}()
+		}
+
+		// Wait for a bit before checking for new topics
+		time.Sleep(1 * time.Second)
+	}
+}
+
 func (m *Manager) StartManagedLocalstack(
 	managedDependencyName string,
 	port int,
@@ -356,7 +434,7 @@ func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]st
 
 func (m *Manager) BroadcastLogsAndRequests() {
 	go func() {
-		var lastLogID, lastRequestID int
+		var lastLogID, lastRequestID, lastKafkaMessageID int
 		for {
 			// Query logs
 			rows, err := m.db.Query(`SELECT id, timestamp, process_name, output_type, content FROM logs WHERE id > ? ORDER BY id ASC LIMIT 100`, lastLogID)
@@ -424,6 +502,40 @@ func (m *Manager) BroadcastLogsAndRequests() {
 			err = rows.Close()
 			if err != nil {
 				log.Printf("error closing rows for http_requests: %v", err)
+			}
+
+			// Query Kafka messages
+			rows, err = m.db.Query(`SELECT id, broker_name, topic_name, message_key, message_value, timestamp FROM kafka_messages WHERE id > ? ORDER BY id ASC LIMIT 100`, lastKafkaMessageID)
+			if err != nil {
+				log.Printf("error querying kafka_messages: %v", err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			for rows.Next() {
+				var id int
+				var timestamp time.Time
+				var brokerName, topicName, messageKey, messageValue string
+				err = rows.Scan(&id, &brokerName, &topicName, &messageKey, &messageValue, &timestamp)
+				if err != nil {
+					log.Printf("error scanning kafka_message row: %v", err)
+					continue
+				}
+
+				lastKafkaMessageID = id
+				messagePayload, _ := json.Marshal(map[string]interface{}{
+					"type":          "kafka_message",
+					"timestamp":     timestamp,
+					"broker_name":   brokerName,
+					"topic_name":    topicName,
+					"message_key":   messageKey,
+					"message_value": messageValue,
+				})
+				m.websocket.Broadcast(messagePayload)
+			}
+			err = rows.Close()
+			if err != nil {
+				log.Printf("error closing rows for kafka_messages: %v", err)
 			}
 
 			time.Sleep(1 * time.Second)

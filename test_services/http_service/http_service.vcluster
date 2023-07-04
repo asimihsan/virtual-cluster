@@ -1,7 +1,4 @@
 service http_service {
-  repository = "https://github.com/yourusername/test_services"
-  branch = "main"
-  directory = "http_service"
   health_check {
     endpoint = "/ping"
   }
