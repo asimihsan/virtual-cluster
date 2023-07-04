@@ -287,6 +287,13 @@ func (m *Manager) StartManagedKafka(
 		return errors.Wrap(err, "failed to wait for kafka")
 	}
 
+	go func() {
+		err = m.ConsumeAndStoreKafkaMessages(managedDependencyName, port)
+		if err != nil {
+			fmt.Println("failed to consume and store kafka messages:", err)
+		}
+	}()
+
 	return nil
 }
 
@@ -295,7 +302,7 @@ func (m *Manager) ConsumeAndStoreKafkaMessages(brokerName string, port int) erro
 	config.Consumer.Return.Errors = true
 
 	// Connect to the Kafka broker
-	broker := fmt.Sprintf("%s:%d", brokerName, port)
+	broker := fmt.Sprintf("localhost:%d", port)
 	kafkaClient, err := sarama.NewClient([]string{broker}, config)
 	if err != nil {
 		return err
@@ -337,7 +344,11 @@ func (m *Manager) ConsumeAndStoreKafkaMessages(brokerName string, port int) erro
 
 			topic := topicName
 			go func() {
+				fmt.Printf("Consuming messages from topic: %s\n", topic)
 				for message := range partitionConsumer.Messages() {
+					fmt.Printf("Consumed message from topic: %s\n", topic)
+					fmt.Printf("Message: %s\n", string(message.Value))
+
 					// For each message, store it in the SQLite database
 					_, err := m.db.Exec("INSERT INTO kafka_messages (broker_name, topic_name, message_key, message_value, timestamp) VALUES (?, ?, ?, ?, ?)",
 						brokerName, topic, string(message.Key), string(message.Value), message.Timestamp)

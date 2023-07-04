@@ -18,20 +18,20 @@ ROOT_DIR="$( cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd )"
 pushd $ROOT_DIR || exit > /dev/null
 trap "popd > /dev/null" EXIT
 
-# Build the Docker image
-docker buildx build -f Dockerfile.generate -t my-antlr-build --load .
+# Build the binary
+docker buildx build -f Dockerfile.binary -t virtual-cluster-build --load .
 
 # Generate a unique container name with a timestamp
 container_name="temp-container-$(date +%s)"
 
 # Create a temporary container
-docker create --name "$container_name" my-antlr-build
+docker create --name "$container_name" virtual-cluster-build
 
-# Copy the generated ANTLR Go target files to the local machine
-rm -rf ./generated
-docker cp "$container_name":/app/antlr/generated ./
+# Copy the binary to the local machine
+rm -f ./build/virtual-cluster
+docker cp "$container_name":/app/build/virtual-cluster ./build/virtual-cluster
 
 # Remove the temporary container
 docker rm "$container_name"
 
-echo "ANTLR Go target files have been copied to ./generated"
+echo "Binary has been copied to ./build/virtual-cluster"

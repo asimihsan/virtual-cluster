@@ -23,3 +23,6 @@ go.work
 generated/*
 !generated/.gitkeep
 .idea
+
+build/*
+!build/.gitkeep

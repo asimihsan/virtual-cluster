@@ -1,7 +1,10 @@
 APP_NAME := $(shell basename $(PWD))
 
-build-docker:
-	docker buildx build -t $(APP_NAME) .
+.PHONY: build
+build:
+	scripts/generate.sh
+	go build -o build/virtual-cluster cmd/virtual-cluster/main.go
 
+.PHONY: generate
 generate:
 	scripts/generate.sh
