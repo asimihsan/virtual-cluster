@@ -300,6 +300,7 @@ func (m *Manager) StartManagedKafka(
 func (m *Manager) ConsumeAndStoreKafkaMessages(brokerName string, port int) error {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
+	config.Metadata.RefreshFrequency = 1 * time.Second
 
 	// Connect to the Kafka broker
 	broker := fmt.Sprintf("localhost:%d", port)
@@ -318,7 +319,6 @@ func (m *Manager) ConsumeAndStoreKafkaMessages(brokerName string, port int) erro
 	consumingTopics := make(map[string]bool)
 
 	for {
-		// Get the list of topics
 		topics, err := kafkaClient.Topics()
 		if err != nil {
 			return err

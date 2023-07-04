@@ -171,8 +171,6 @@ func main() {
 							}
 							if c.Int("manager-port") != 0 {
 								opts = append(opts, substrate.WithHTTPPort(c.Int("manager-port")))
-							} else {
-								opts = append(opts, substrate.WithHTTPPort(1371))
 							}
 							manager, err := substrate.NewManager(dbPath, opts...)
 							if err != nil {
