@@ -77,7 +77,7 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS logs (
 			id INTEGER PRIMARY KEY,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			timestamp TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 			process_name TEXT,
 			output_type TEXT,
 			content TEXT
@@ -90,7 +90,7 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS http_requests (
 			id INTEGER PRIMARY KEY,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			timestamp TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 			process_name TEXT,
 			method TEXT,
 			url TEXT,
@@ -105,7 +105,7 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS kafka_messages (
 			id INTEGER PRIMARY KEY,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			timestamp TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 			broker_name TEXT,
 			topic_name TEXT,
 			message_key TEXT,
@@ -349,9 +349,12 @@ func (m *Manager) ConsumeAndStoreKafkaMessages(brokerName string, port int) erro
 					fmt.Printf("Consumed message from topic: %s\n", topic)
 					fmt.Printf("Message: %s\n", string(message.Value))
 
+					// convert message.Timestamp to UTC then to format '%Y-%m-%dT%H:%M:%fZ', note that time.RFC3339 does not have fractional seconds!
+					timestamp := message.Timestamp.UTC().Format("2006-01-02T15:04:05.123Z")
+
 					// For each message, store it in the SQLite database
 					_, err := m.db.Exec("INSERT INTO kafka_messages (broker_name, topic_name, message_key, message_value, timestamp) VALUES (?, ?, ?, ?, ?)",
-						brokerName, topic, string(message.Key), string(message.Value), message.Timestamp)
+						brokerName, topic, string(message.Key), string(message.Value), timestamp)
 					if err != nil {
 						log.Printf("Failed to insert message into database: %v", err)
 					}
@@ -457,8 +460,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 
 			for rows.Next() {
 				var id int
-				var timestamp time.Time
-				var processName, outputType, content string
+				var processName, outputType, content, timestamp string
 				err = rows.Scan(&id, &timestamp, &processName, &outputType, &content)
 				if err != nil {
 					log.Printf("error scanning log row: %v", err)
@@ -467,6 +469,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 
 				lastLogID = id
 				message, _ := json.Marshal(map[string]interface{}{
+					"id":           id,
 					"type":         "log",
 					"timestamp":    timestamp,
 					"process_name": processName,
@@ -490,8 +493,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 
 			for rows.Next() {
 				var id int
-				var timestamp time.Time
-				var processName, method, url, headers, body string
+				var processName, method, url, headers, body, timestamp string
 				err = rows.Scan(&id, &timestamp, &processName, &method, &url, &headers, &body)
 				if err != nil {
 					log.Printf("error scanning http_request row: %v", err)
@@ -500,6 +502,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 
 				lastRequestID = id
 				message, _ := json.Marshal(map[string]interface{}{
+					"id":           id,
 					"type":         "http_request",
 					"timestamp":    timestamp,
 					"process_name": processName,
@@ -525,8 +528,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 
 			for rows.Next() {
 				var id int
-				var timestamp time.Time
-				var brokerName, topicName, messageKey, messageValue string
+				var brokerName, topicName, messageKey, messageValue, timestamp string
 				err = rows.Scan(&id, &brokerName, &topicName, &messageKey, &messageValue, &timestamp)
 				if err != nil {
 					log.Printf("error scanning kafka_message row: %v", err)
@@ -535,6 +537,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 
 				lastKafkaMessageID = id
 				messagePayload, _ := json.Marshal(map[string]interface{}{
+					"id":            id,
 					"type":          "kafka_message",
 					"timestamp":     timestamp,
 					"broker_name":   brokerName,
