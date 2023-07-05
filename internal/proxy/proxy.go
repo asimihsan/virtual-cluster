@@ -58,14 +58,21 @@ func NewProxy(
 	return proxy, nil
 }
 
-type statusRecorder struct {
+type responseRecorder struct {
 	http.ResponseWriter
 	statusCode int
+	headers    http.Header
+	body       bytes.Buffer
 }
 
-func (sr *statusRecorder) WriteHeader(statusCode int) {
-	sr.statusCode = statusCode
-	sr.ResponseWriter.WriteHeader(statusCode)
+func (rr *responseRecorder) WriteHeader(statusCode int) {
+	rr.statusCode = statusCode
+	rr.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (rr *responseRecorder) Write(b []byte) (int, error) {
+	rr.body.Write(b)
+	return rr.ResponseWriter.Write(b)
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -92,28 +99,63 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Msg("Captured HTTP request")
 	}
 
-	_, err = p.db.Exec(`
+	tx, err := p.db.Begin()
+	if err != nil {
+		log.Printf("Error beginning transaction: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	res, err := tx.Exec(`
 		INSERT INTO http_requests (process_name, method, url, headers, body)
 	VALUES (?, ?, ?, ?, ?)`,
 		p.processName, r.Method, r.URL.String(), string(headers), string(bodyBytes))
 	if err != nil {
 		log.Printf("Error recording HTTP request: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	requestID, err := res.LastInsertId()
+	if err != nil {
+		log.Printf("Error getting last insert ID: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Printf("Error committing transaction: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
 
 	// Replace the original request body with the second io.ReadCloser
 	r.Body = rBody1
 
-	// Create a statusRecorder to capture the status code
-	sr := &statusRecorder{ResponseWriter: w}
+	// Create a responseRecorder to capture the status code, headers and body
+	rr := &responseRecorder{ResponseWriter: w, headers: make(http.Header)}
 
-	// Pass the statusRecorder to the proxy
+	// Pass the responseRecorder to the proxy
 	proxy := httputil.NewSingleHostReverseProxy(p.target)
-	proxy.ServeHTTP(sr, r)
+	proxy.ServeHTTP(rr, r)
 
+	// Record the HTTP response into the SQLite table
+	headers, _ = json.Marshal(rr.headers)
+	body := rr.body.String()
 	if p.verbose {
 		log.Debug().
 			Str("process_name", p.processName).
-			Int("status_code", sr.statusCode).
-			Msg("Captured status code")
+			Int("status_code", rr.statusCode).
+			Str("headers", string(headers)).
+			Str("body", body).
+			Msg("Captured HTTP response")
+	}
+
+	_, err = p.db.Exec(
+		`INSERT INTO http_responses (http_request_id, process_name, status_code, headers, body) VALUES (?, ?, ?, ?, ?)`,
+		requestID, p.processName, rr.statusCode, string(headers), body)
+	if err != nil {
+		log.Printf("Error recording HTTP response: %v", err)
 	}
 }

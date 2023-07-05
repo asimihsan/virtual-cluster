@@ -31,7 +31,7 @@ func main() {
 	})
 
 	e.GET("/ping", func(c echo.Context) error {
-		log.Info().Msg("Received request at /health")
+		log.Info().Msg("Received request at /ping")
 		return c.String(http.StatusOK, "healthy")
 	})
 

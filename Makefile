@@ -8,3 +8,7 @@ build:
 .PHONY: generate
 generate:
 	scripts/generate.sh
+
+.PHONY: test
+test:
+	go test -p 1 ./...

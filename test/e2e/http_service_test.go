@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"github.com/asimihsan/virtual-cluster/internal/utils"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -30,9 +31,18 @@ func TestHTTPService(t *testing.T) {
 	ast, err := parser.ParseVCluster(string(vclusterContent))
 	assert.NoError(t, err)
 
-	manager, err := substrate.NewManager(":memory:")
+	dbPath := "/tmp/foo-test-http-service.sqlite3"
+	if err := os.Remove(dbPath); err != nil {
+		t.Fatalf("failed to remove dbPath: %v", err)
+	}
+	manager, err := substrate.NewManager(dbPath)
 	assert.NoError(t, err)
-	defer manager.Close()
+	defer func(manager *substrate.Manager) {
+		err := manager.Close()
+		if err != nil {
+			t.Fatalf("failed to close manager: %v", err)
+		}
+	}(manager)
 
 	err = manager.AddWorkingDirectoryUpward("http_service", "./test_services/http_service", true /*verbose*/)
 	if err != nil {
@@ -46,7 +56,7 @@ func TestHTTPService(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	endpoint := fmt.Sprintf("http://localhost:%d", *ast.Services[0].ProxyPort)
+	endpoint := fmt.Sprintf("http://localhost:%d/ping", *ast.Services[0].ProxyPort)
 	resp, err := http.Get(endpoint)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -85,15 +95,19 @@ func TestHTTPService(t *testing.T) {
 
 	// assert the fields
 	assert.Equal(t, "GET", method)
-	assert.Equal(t, "/", uri)
+	assert.Equal(t, "/ping", uri)
 	assert.Equal(t, 200, status)
 
 	proxyRequests, err := manager.GetHTTPProxyRequestsForProcess("http_service")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(proxyRequests))
 	assert.Equal(t, "GET", proxyRequests[0].Method)
-	assert.Equal(t, "/", proxyRequests[0].URL)
+	assert.Equal(t, "/ping", proxyRequests[0].URL)
 
-	err = manager.Close()
+	proxyResponses, err := manager.GetHTTPProxyResponsesForProcess("http_service")
 	assert.NoError(t, err)
+	assert.Equal(t, 1, len(proxyResponses))
+	assert.Equal(t, 200, proxyResponses[0].StatusCode)
+	assert.Equal(t, "healthy", proxyResponses[0].Body)
+	assert.Equal(t, proxyRequests[0].ID, proxyResponses[0].HTTPRequestID)
 }

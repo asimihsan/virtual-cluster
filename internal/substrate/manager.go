@@ -104,6 +104,21 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 	}
 
 	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS http_responses (
+			id INTEGER PRIMARY KEY,
+			http_request_id INTEGER,
+			timestamp TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+			process_name TEXT,
+			status_code INTEGER,
+			headers TEXT,
+			body TEXT
+		)
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS kafka_messages (
 			id INTEGER PRIMARY KEY,
 			timestamp TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -491,7 +506,7 @@ func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]st
 
 func (m *Manager) BroadcastLogsAndRequests() {
 	go func() {
-		var lastLogID, lastRequestID, lastKafkaMessageID int
+		var lastLogID, lastHTTPRequestID, lastHTTPResponseID, lastKafkaMessageID int
 		for {
 			// Query logs
 			rows, err := m.db.Query(`SELECT id, timestamp, process_name, output_type, content FROM logs WHERE id > ? ORDER BY id ASC LIMIT 100`, lastLogID)
@@ -527,7 +542,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 			}
 
 			// Query HTTP requests
-			rows, err = m.db.Query(`SELECT id, timestamp, process_name, method, url, headers, body FROM http_requests WHERE id > ? ORDER BY id ASC LIMIT 100`, lastRequestID)
+			rows, err = m.db.Query(`SELECT id, timestamp, process_name, method, url, headers, body FROM http_requests WHERE id > ? ORDER BY id ASC LIMIT 100`, lastHTTPRequestID)
 			if err != nil {
 				log.Printf("error querying http_requests: %v", err)
 				time.Sleep(1 * time.Second)
@@ -543,7 +558,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 					continue
 				}
 
-				lastRequestID = id
+				lastHTTPRequestID = id
 				message, _ := json.Marshal(map[string]interface{}{
 					"id":           id,
 					"type":         "http_request",
@@ -559,6 +574,37 @@ func (m *Manager) BroadcastLogsAndRequests() {
 			err = rows.Close()
 			if err != nil {
 				log.Printf("error closing rows for http_requests: %v", err)
+			}
+
+			// Query HTTP responses
+			rows, err = m.db.Query(`SELECT id, http_request_id, timestamp, process_name, status_code, headers, body FROM http_responses WHERE id > ? ORDER BY id ASC LIMIT 100`, lastHTTPResponseID)
+			if err != nil {
+				log.Printf("error querying http_responses: %v", err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			for rows.Next() {
+				var id, httpRequestID, statusCode int
+				var processName, headers, body, timestamp string
+				err = rows.Scan(&id, &httpRequestID, &timestamp, &processName, &statusCode, &headers, &body)
+				if err != nil {
+					log.Printf("error scanning http_response row: %v", err)
+					continue
+				}
+
+				lastHTTPResponseID = id
+				message, _ := json.Marshal(map[string]interface{}{
+					"id":              id,
+					"http_request_id": httpRequestID,
+					"type":            "http_response",
+					"timestamp":       timestamp,
+					"process_name":    processName,
+					"status_code":     statusCode,
+					"headers":         headers,
+					"body":            body,
+				})
+				m.websocket.Broadcast(message)
 			}
 
 			// Query Kafka messages
@@ -601,6 +647,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 }
 
 type HTTPProxyRequest struct {
+	ID        int
 	Timestamp string
 	Method    string
 	URL       string
@@ -608,10 +655,19 @@ type HTTPProxyRequest struct {
 	Body      string
 }
 
+type HTTPProxyResponse struct {
+	ID            int
+	HTTPRequestID int
+	Timestamp     string
+	StatusCode    int
+	Headers       string
+	Body          string
+}
+
 func (m *Manager) GetHTTPProxyRequestsForProcess(
 	processName string,
 ) ([]*HTTPProxyRequest, error) {
-	rows, err := m.db.Query("SELECT timestamp, method, url, headers, body FROM http_requests WHERE process_name = ?", processName)
+	rows, err := m.db.Query("SELECT id, timestamp, method, url, headers, body FROM http_requests WHERE process_name = ?", processName)
 	if err != nil {
 		return nil, err
 	}
@@ -620,7 +676,7 @@ func (m *Manager) GetHTTPProxyRequestsForProcess(
 	var requests []*HTTPProxyRequest
 	for rows.Next() {
 		var request HTTPProxyRequest
-		err = rows.Scan(&request.Timestamp, &request.Method, &request.URL, &request.Headers, &request.Body)
+		err = rows.Scan(&request.ID, &request.Timestamp, &request.Method, &request.URL, &request.Headers, &request.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -628,6 +684,28 @@ func (m *Manager) GetHTTPProxyRequestsForProcess(
 	}
 
 	return requests, nil
+}
+
+func (m *Manager) GetHTTPProxyResponsesForProcess(
+	processName string,
+) ([]*HTTPProxyResponse, error) {
+	rows, err := m.db.Query("SELECT id, http_request_id, timestamp, status_code, headers, body FROM http_responses WHERE process_name = ?", processName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var responses []*HTTPProxyResponse
+	for rows.Next() {
+		var response HTTPProxyResponse
+		err = rows.Scan(&response.ID, &response.HTTPRequestID, &response.Timestamp, &response.StatusCode, &response.Headers, &response.Body)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, &response)
+	}
+
+	return responses, nil
 }
 
 func (m *Manager) RunHTTPProxy(
