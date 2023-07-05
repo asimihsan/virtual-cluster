@@ -74,8 +74,8 @@ const EventList: React.FC = () => {
                 return (
                     <tr key={index} style={{ backgroundColor }}>
                         <td><div>{event.timestamp}</div></td>
-                        <td><div>{event.type}</div></td>
                         <td><div>{getProcessName(event)}</div></td>
+                        <td><div>{event.type}</div></td>
                         <td><div>{getEventContent(event)}</div></td>
                     </tr>
                 );

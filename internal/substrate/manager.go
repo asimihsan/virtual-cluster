@@ -24,6 +24,7 @@ import (
 	"github.com/asimihsan/virtual-cluster/internal/websocket"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	_ "github.com/mattn/go-sqlite3"
@@ -34,6 +35,10 @@ import (
 	"path/filepath"
 	"time"
 )
+
+var jsonSorted = jsoniter.Config{
+	SortMapKeys: true,
+}.Froze()
 
 type Manager struct {
 	dbPath             string
@@ -504,6 +509,24 @@ func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]st
 	return logs, nil
 }
 
+func (m *Manager) prepareLogContent(content string) string {
+	var logContent map[string]interface{}
+	err := json.Unmarshal([]byte(content), &logContent)
+	if err != nil {
+		return content
+	}
+
+	delete(logContent, "time")
+	delete(logContent, "timestamp")
+
+	logContentBytes, err := jsonSorted.Marshal(logContent)
+	if err != nil {
+		return content
+	}
+
+	return string(logContentBytes)
+}
+
 func (m *Manager) BroadcastLogsAndRequests() {
 	go func() {
 		var lastLogID, lastHTTPRequestID, lastHTTPResponseID, lastKafkaMessageID int
@@ -526,6 +549,7 @@ func (m *Manager) BroadcastLogsAndRequests() {
 				}
 
 				lastLogID = id
+				content = m.prepareLogContent(content)
 				message, _ := json.Marshal(map[string]interface{}{
 					"id":           id,
 					"type":         "log",
