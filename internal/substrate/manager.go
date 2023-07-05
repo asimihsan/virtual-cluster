@@ -594,16 +594,35 @@ func (m *Manager) BroadcastLogsAndRequests() {
 				}
 
 				lastHTTPResponseID = id
+
+				// Query the original HTTP request
+				var originalRequest HTTPProxyRequest
+				err = m.db.QueryRow("SELECT id, timestamp, method, url, headers, body FROM http_requests WHERE id = ?", httpRequestID).Scan(&originalRequest.ID, &originalRequest.Timestamp, &originalRequest.Method, &originalRequest.URL, &originalRequest.Headers, &originalRequest.Body)
+				if err != nil {
+					log.Printf("error querying original http_request: %v", err)
+					continue
+				}
+
 				message, _ := json.Marshal(map[string]interface{}{
-					"id":              id,
-					"http_request_id": httpRequestID,
-					"type":            "http_response",
-					"timestamp":       timestamp,
-					"process_name":    processName,
-					"status_code":     statusCode,
-					"headers":         headers,
-					"body":            body,
+					"id":           id,
+					"type":         "http_response",
+					"timestamp":    timestamp,
+					"process_name": processName,
+					"status_code":  statusCode,
+					"headers":      headers,
+					"body":         body,
+					"http_request": map[string]interface{}{
+						"id":           originalRequest.ID,
+						"type":         "http_request",
+						"timestamp":    originalRequest.Timestamp,
+						"process_name": processName,
+						"method":       originalRequest.Method,
+						"url":          originalRequest.URL,
+						"headers":      originalRequest.Headers,
+						"body":         originalRequest.Body,
+					},
 				})
+
 				m.websocket.Broadcast(message)
 			}
 

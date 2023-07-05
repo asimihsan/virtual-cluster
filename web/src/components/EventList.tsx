@@ -12,7 +12,7 @@ import React from 'react';
 import { useEventContext } from '../utils/EventContext';
 import useEventService from '../services/useEventService';
 import useColor from '../utils/useColor';
-import {HttpRequestEvent, KafkaMessageEvent, LogEvent} from "../models/Event";
+import {HttpRequestEvent, HttpResponseEvent, KafkaMessageEvent, LogEvent} from "../models/Event";
 
 import './EventList.css';
 
@@ -23,14 +23,23 @@ const EventList: React.FC = () => {
 
     useEventService();
 
-    const getEventContent = (event: LogEvent | HttpRequestEvent | KafkaMessageEvent) => {
+    const getEventContent = (event: LogEvent | HttpRequestEvent | HttpResponseEvent | KafkaMessageEvent) => {
         switch (event.type) {
             case 'log':
                 const logEvent = event as LogEvent;
                 return logEvent.content?.substring(0, 100);
             case 'http_request':
                 const httpRequestEvent = event as HttpRequestEvent;
-                return `${httpRequestEvent.method} - ${httpRequestEvent.url} - ${httpRequestEvent.body?.substring(0, 100)}`;
+                // if body is null or empty string, use <no body> else get it and truncate
+                var body = httpRequestEvent.body;
+                if (body === null || body === '') {
+                    body = '<no body>';
+                }
+                return `${httpRequestEvent.method} - ${httpRequestEvent.url} - ${body?.substring(0, 100)}`;
+            case 'http_response':
+                const httpResponseEvent = event as HttpResponseEvent;
+                const httpRequestEvent2 = httpResponseEvent.http_request;
+                return `${httpRequestEvent2.method} - ${httpRequestEvent2.url} - ${httpResponseEvent.status_code} - ${httpResponseEvent.body?.substring(0, 100)}`;
             case 'kafka_message':
                 const kafkaMessageEvent = event as KafkaMessageEvent;
                 return `${kafkaMessageEvent.broker_name} - ${kafkaMessageEvent.topic_name} - ${kafkaMessageEvent.message_value?.substring(0, 100)}`;
@@ -39,7 +48,7 @@ const EventList: React.FC = () => {
         }
     };
 
-    const getProcessName = (event: LogEvent | HttpRequestEvent | KafkaMessageEvent) => {
+    const getProcessName = (event: LogEvent | HttpRequestEvent | HttpResponseEvent | KafkaMessageEvent) => {
         switch (event.type) {
             case 'log':
                 const logEvent = event as LogEvent;
@@ -47,6 +56,9 @@ const EventList: React.FC = () => {
             case 'http_request':
                 const httpRequestEvent = event as HttpRequestEvent;
                 return httpRequestEvent.process_name;
+            case 'http_response':
+                const httpResponseEvent = event as HttpResponseEvent;
+                return httpResponseEvent.process_name;
             case 'kafka_message':
                 return '';
             default:

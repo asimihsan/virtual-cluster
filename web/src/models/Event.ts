@@ -28,6 +28,17 @@ export interface HttpRequestEvent {
     body: string;
 }
 
+export interface HttpResponseEvent {
+    id: number;
+    type: string;
+    timestamp: string;
+    process_name: string;
+    status_code: number;
+    headers: string;
+    body: string;
+    http_request: HttpRequestEvent;
+}
+
 export interface KafkaMessageEvent {
     id: number;
     type: string;

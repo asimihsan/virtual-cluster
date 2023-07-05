@@ -9,9 +9,9 @@
  */
 
 import React from 'react';
-import { LogEvent, HttpRequestEvent, KafkaMessageEvent } from '../models/Event';
+import { LogEvent, HttpRequestEvent, HttpResponseEvent, KafkaMessageEvent } from '../models/Event';
 
-type Event = LogEvent | HttpRequestEvent | KafkaMessageEvent;
+type Event = LogEvent | HttpRequestEvent | HttpResponseEvent | KafkaMessageEvent;
 
 interface EventContextValue {
     events: Event[];

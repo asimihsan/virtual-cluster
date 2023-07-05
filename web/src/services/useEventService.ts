@@ -9,7 +9,7 @@
  */
 
 import { useEffect } from 'react';
-import { LogEvent, HttpRequestEvent, KafkaMessageEvent } from '../models/Event';
+import {LogEvent, HttpRequestEvent, KafkaMessageEvent, HttpResponseEvent} from '../models/Event';
 import { useEventContext } from '../utils/EventContext';
 
 const useEventService = () => {
@@ -31,6 +31,9 @@ const useEventService = () => {
                             break;
                         case 'http_request':
                             addEvent(data as HttpRequestEvent);
+                            break;
+                        case 'http_response':
+                            addEvent(data as HttpResponseEvent);
                             break;
                         case 'kafka_message':
                             addEvent(data as KafkaMessageEvent);
