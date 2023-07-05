@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { murmur3 } from 'murmurhash-js';
 
 const TABLEAU_10 = [
     '#1f77b4',
@@ -24,13 +25,17 @@ const TABLEAU_10 = [
 ];
 
 const useColor = () => {
-    const [colorMap, setColorMap] = useState<{ [key: string]: string }>({});
+    const [colorMap, setColorMap] = useState<{ [key: string]: string }>({
+        'kafka_message': TABLEAU_10[0], // Reserve the first color for 'kafka_message'
+    });
 
     const getColor = (key: string) => {
         if (!colorMap[key]) {
+            const hash = murmur3(key)
+            const colorIndex = (hash % (TABLEAU_10.length - 1)) + 1; // Avoid index 0, which is reserved for 'kafka_message'
             setColorMap((prevColorMap) => ({
                 ...prevColorMap,
-                [key]: TABLEAU_10[Object.keys(prevColorMap).length % TABLEAU_10.length],
+                [key]: TABLEAU_10[colorIndex],
             }));
         }
 

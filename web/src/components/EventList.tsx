@@ -70,7 +70,8 @@ const EventList: React.FC = () => {
         <table className="event-table">
             <tbody>
             {events.map((event, index) => {
-                const backgroundColor = getColor(event.process_name || 'kafka_message');
+                const key: string = event.type === 'kafka_message' ? 'kafka_message' : event.process_name;
+                const backgroundColor = getColor(key);
                 return (
                     <tr key={index} style={{ backgroundColor }}>
                         <td><div>{event.timestamp}</div></td>
