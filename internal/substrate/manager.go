@@ -43,6 +43,7 @@ type Manager struct {
 	verbose            bool
 	httpPort           int
 	websocket          *websocket.Broadcaster
+	stopChans          []chan struct{}
 }
 
 func (m *Manager) Websocket() *websocket.Broadcaster {
@@ -124,6 +125,7 @@ func NewManager(dbPath string, opts ...ManagerOption) (*Manager, error) {
 		workingDirectories: workingDirectories,
 		websocket:          websocket.NewBroadcaster(),
 		httpPort:           1371,
+		stopChans:          make([]chan struct{}, 0),
 	}
 
 	for _, opt := range opts {
@@ -171,7 +173,9 @@ func (m *Manager) AddWorkingDirectoryUpward(serviceName, path string, verbose bo
 }
 
 func (m *Manager) Close() error {
-	m.StopAllProcesses()
+	for _, stopChan := range m.stopChans {
+		stopChan <- struct{}{}
+	}
 	return m.db.Close()
 }
 
@@ -214,6 +218,23 @@ func (m *Manager) StartServicesAndDependencies(
 				workingDirectory = "."
 			}
 
+			if service.ServicePort != nil {
+				fmt.Println("Waiting for service port to be available:", service.Name)
+				pw := utils.NewPortWaiter(string(rune(*service.ServicePort)))
+				err := pw.Wait()
+				if err != nil {
+					return errors.Wrapf(err, "failed to wait for service port: %s", service.Name)
+				}
+			}
+			if service.ProxyPort != nil {
+				fmt.Println("Waiting for proxy port to be available:", service.Name)
+				pw := utils.NewPortWaiter(string(rune(*service.ProxyPort)))
+				err := pw.Wait()
+				if err != nil {
+					return errors.Wrapf(err, "failed to wait for proxy port: %s", service.Name)
+				}
+			}
+
 			fmt.Println("Starting service:", service.Name)
 			process := &ManagedProcess{
 				Name:             service.Name,
@@ -228,10 +249,15 @@ func (m *Manager) StartServicesAndDependencies(
 
 			if service.ServicePort != nil && service.ProxyPort != nil {
 				fmt.Println("Starting HTTP proxy for service:", service.Name)
+				stop := make(chan struct{}, 1)
+				m.stopChans = append(m.stopChans, stop)
+
 				err := m.RunHTTPProxy(
 					fmt.Sprintf("http://localhost:%d", *service.ServicePort),
 					fmt.Sprintf(":%d", *service.ProxyPort),
-					service.Name)
+					service.Name,
+					stop,
+				)
 				if err != nil {
 					return err
 				}
@@ -268,6 +294,12 @@ func (m *Manager) StartManagedKafka(
 	cleanupContainers("broker1245")
 	cleanupContainers("kowl12345")
 	cleanupNetworks("my_custom_network")
+
+	pw := utils.NewPortWaiter(string(rune(port)))
+	err = pw.Wait()
+	if err != nil {
+		return errors.Wrapf(err, "failed to wait for kafka port: %s", managedDependencyName)
+	}
 
 	fmt.Println("Starting managed dependency:", managedDependencyName)
 	workingDirectory := filepath.Dir(composeFilePath)
@@ -392,6 +424,12 @@ func (m *Manager) StartManagedLocalstack(
 	cleanupContainers("localstack_main")
 	cleanupNetworks("localstack_default")
 
+	pw := utils.NewPortWaiter(string(rune(port)))
+	err = pw.Wait()
+	if err != nil {
+		return errors.Wrapf(err, "failed to wait for localstack port: %s", managedDependencyName)
+	}
+
 	fmt.Println("Starting managed dependency:", managedDependencyName)
 	workingDirectory := filepath.Dir(composeFilePath)
 	process := &ManagedProcess{
@@ -429,16 +467,21 @@ func (m *Manager) StopAllProcesses() {
 func (m *Manager) GetLogsForProcess(processName string, outputType string) ([]string, error) {
 	rows, err := m.db.Query("SELECT content FROM logs WHERE process_name = ? AND output_type = ?", processName, outputType)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to query logs")
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			fmt.Println("failed to close rows:", err)
+		}
+	}(rows)
 
 	var logs []string
 	for rows.Next() {
 		var content string
 		err = rows.Scan(&content)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan log row")
 		}
 		logs = append(logs, content)
 	}
@@ -591,6 +634,7 @@ func (m *Manager) RunHTTPProxy(
 	target string,
 	listenAddr string,
 	processName string,
+	stop chan struct{},
 ) error {
 	var proxyOptions []proxy.ProxyOption
 	if m.verbose {
@@ -604,8 +648,20 @@ func (m *Manager) RunHTTPProxy(
 
 	go func() {
 		log.Printf("Starting HTTP proxy on %s", listenAddr)
-		if err := http.ListenAndServe(listenAddr, httpProxy); err != nil {
-			log.Printf("Error starting HTTP proxy: %v", err)
+		server := &http.Server{Addr: listenAddr, Handler: httpProxy}
+
+		go func() {
+			if err := server.ListenAndServe(); err != nil {
+				log.Printf("Error starting HTTP proxy: %v", err)
+			}
+		}()
+
+		select {
+		case <-stop:
+			log.Printf("Stopping HTTP proxy")
+			if err := server.Shutdown(context.Background()); err != nil {
+				log.Printf("Error stopping HTTP proxy: %v", err)
+			}
 		}
 	}()
 

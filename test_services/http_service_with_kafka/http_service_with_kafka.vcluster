@@ -5,8 +5,8 @@ service http_service_with_kafka {
   health_check {
     endpoint = "/ping"
   }
-  service_port = 1323
-  proxy_port = 1324
+  service_port = 1325
+  proxy_port = 1326
 
   dependency = kafka
 

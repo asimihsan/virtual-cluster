@@ -34,7 +34,7 @@ func main() {
 				Name:    "http-port",
 				Usage:   "HTTP server port",
 				EnvVars: []string{"PORT"},
-				Value:   "1323",
+				Value:   "1325",
 			},
 			&cli.StringFlag{
 				Name:    "kafka-broker",

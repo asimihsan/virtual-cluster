@@ -33,7 +33,7 @@ func TestHTTPServiceWithKafka(t *testing.T) {
 	ast, err := parser.ParseVCluster(string(vclusterContent))
 	assert.NoError(t, err)
 
-	manager, err := substrate.NewManager(":memory:", substrate.WithVerbose())
+	manager, err := substrate.NewManager("/tmp/foo.sqlite3", substrate.WithVerbose())
 	assert.NoError(t, err)
 	defer func(manager *substrate.Manager) {
 		err := manager.Close()
@@ -67,6 +67,7 @@ func TestHTTPServiceWithKafka(t *testing.T) {
 	endpoint := fmt.Sprintf("http://localhost:%d/ping", *ast.Services[0].ServicePort)
 	resp, err := http.Get(endpoint)
 	assert.NoError(t, err)
+	assert.NotNil(t, resp)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Send GET to /ping with proxy
@@ -95,4 +96,6 @@ func TestHTTPServiceWithKafka(t *testing.T) {
 	assert.Equal(t, "Message 1", string(msg.Value))
 
 	manager.StopAllProcesses()
+	err = manager.Close()
+	assert.NoError(t, err)
 }

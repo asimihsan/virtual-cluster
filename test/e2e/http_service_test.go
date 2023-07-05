@@ -58,6 +58,9 @@ func TestHTTPService(t *testing.T) {
 
 	assert.Equal(t, 1, len(logs))
 
+	// if "bind: address already in use" then the previous test didn't clean up properly
+	assert.NotContains(t, logs[0], "bind: address already in use")
+
 	var logFields map[string]interface{}
 	err = json.Unmarshal([]byte(logs[0]), &logFields)
 	if err != nil {
@@ -65,8 +68,19 @@ func TestHTTPService(t *testing.T) {
 	}
 
 	// get the fields
+	if _, ok := logFields["method"]; !ok {
+		t.Fatalf("logFields did not have 'method' field")
+	}
 	method := logFields["method"].(string)
+
+	if _, ok := logFields["uri"]; !ok {
+		t.Fatalf("logFields did not have 'uri' field")
+	}
 	uri := logFields["uri"].(string)
+
+	if _, ok := logFields["status"]; !ok {
+		t.Fatalf("logFields did not have 'status' field")
+	}
 	status := int(logFields["status"].(float64))
 
 	// assert the fields
@@ -79,4 +93,7 @@ func TestHTTPService(t *testing.T) {
 	assert.Equal(t, 1, len(proxyRequests))
 	assert.Equal(t, "GET", proxyRequests[0].Method)
 	assert.Equal(t, "/", proxyRequests[0].URL)
+
+	err = manager.Close()
+	assert.NoError(t, err)
 }
