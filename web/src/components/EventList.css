@@ -8,11 +8,18 @@
  * SPDX-License-Identifier: MPL-2.0
  */
 
+@font-face {
+    font-family: 'Iosevka Custom';
+    src: url('../fonts/iosevka-custom-regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
 .event-table {
     width: 100%;
     color: black;
-    font-family: Menlo, monospace;
-    font-size: 12px;
+    font-family: 'Iosevka Custom', Menlo, monospace;
+    font-size: 16px;
     border-collapse: collapse;
 }
 
