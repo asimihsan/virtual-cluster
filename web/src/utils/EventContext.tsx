@@ -13,9 +13,15 @@ const EventContext = React.createContext<EventContextValue | undefined>(undefine
 // @ts-ignore
 export const EventProvider: React.FC = ({ children }) => {
     const [events, setEvents] = React.useState<Event[]>([]);
+    const eventMap = React.useRef(new Map<string, Event>());
 
     const addEvent = (event: Event) => {
-        setEvents((prevEvents) => [...prevEvents, event].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
+        const eventKey = `${event.type}-${event.id}`;
+
+        if (!eventMap.current.has(eventKey)) {
+            eventMap.current.set(eventKey, event);
+            setEvents((prevEvents) => [...prevEvents, event].sort((a, b) => a.timestamp.localeCompare(b.timestamp)));
+        }
     };
 
     return (
