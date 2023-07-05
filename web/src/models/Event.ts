@@ -22,9 +22,9 @@ export interface KafkaMessageEvent {
     id: number;
     type: string;
     timestamp: string;
+    process_name: string;
     broker_name: string;
     topic_name: string;
     message_key: string;
     message_value: string;
 }
-

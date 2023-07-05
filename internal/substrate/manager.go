@@ -273,7 +273,7 @@ func (m *Manager) StartManagedKafka(
 	workingDirectory := filepath.Dir(composeFilePath)
 	process := &ManagedProcess{
 		Name:             managedDependencyName,
-		RunCommands:      []string{"docker compose up --no-color --timestamps"},
+		RunCommands:      []string{"docker compose up --no-color"},
 		WorkingDirectory: workingDirectory,
 		Stop:             make(chan struct{}, 1),
 	}
@@ -396,7 +396,7 @@ func (m *Manager) StartManagedLocalstack(
 	workingDirectory := filepath.Dir(composeFilePath)
 	process := &ManagedProcess{
 		Name:             managedDependencyName,
-		RunCommands:      []string{"docker compose up --no-color --timestamps"},
+		RunCommands:      []string{"docker compose up --no-color"},
 		WorkingDirectory: workingDirectory,
 		Stop:             make(chan struct{}, 1),
 	}

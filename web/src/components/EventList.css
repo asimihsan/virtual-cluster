@@ -1,0 +1,15 @@
+.event-table {
+    width: 100%;
+    color: black;
+    font-family: Menlo, monospace;
+    border-collapse: collapse;
+}
+
+.event-table td {
+    padding: 0;
+    border-spacing: 0;
+}
+
+.event-table div {
+    padding: 10px;
+}
